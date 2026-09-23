@@ -1,0 +1,183 @@
+package com.leadquote.service;
+
+import com.leadquote.config.CompanyProperties;
+import com.leadquote.config.WhatsAppProperties;
+import com.leadquote.entity.*;
+import com.leadquote.exception.WhatsAppApiException;
+import com.leadquote.repository.WhatsAppMessageRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Wraps the official WhatsApp Business (Cloud) API. Never uses browser automation.
+ * Credentials always come from environment-backed configuration (see WhatsAppProperties),
+ * never hard-coded, never sent to the frontend.
+ *
+ * If a call fails, we persist the failure on the WhatsAppMessage row instead of throwing away
+ * the lead/quotation, so an employee can retry manually from the dashboard.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class WhatsAppService {
+
+    private final WebClient webClient;
+    private final WhatsAppProperties whatsAppProperties;
+    private final CompanyProperties companyProperties;
+    private final WhatsAppMessageRepository whatsAppMessageRepository;
+
+    public WhatsAppMessage sendWelcomeMessage(Lead lead, String enquiryFormLink) {
+        String body = String.format(
+                "Hello %s \uD83D\uDC4B%n%nThank you for your enquiry with %s.%n%n" +
+                "To understand your requirements and prepare an accurate quotation, please complete our short enquiry form.%n%n" +
+                "Please click the link below:%n%n%s%n%nThank you.",
+                lead.getCustomerName(), companyProperties.getName(), enquiryFormLink);
+
+        return sendTextMessage(lead, WhatsAppMessageType.WELCOME, body);
+    }
+
+    public WhatsAppMessage sendEnquiryForm(Lead lead, String enquiryFormLink) {
+        String body = "Here is your enquiry form link: " + enquiryFormLink;
+        return sendTextMessage(lead, WhatsAppMessageType.ENQUIRY_FORM, body);
+    }
+
+    public WhatsAppMessage sendQuotation(Lead lead, Quotation quotation, String quotationPageLink) {
+        String textBody = String.format(
+                "Hello %s,%n%nThank you for providing your requirements.%n%nYour quotation is ready.%n%n" +
+                "Quotation No: %s%nTotal Amount: %s%n%n" +
+                "Please review the attached quotation.%n%n" +
+                "You can accept the quotation or request changes here: %s",
+                lead.getCustomerName(), quotation.getQuotationNumber(), quotation.getTotalAmount(), quotationPageLink);
+
+        WhatsAppMessage textMsg = sendTextMessage(lead, WhatsAppMessageType.QUOTATION, textBody);
+
+        // Send the PDF document as a follow-up media message, if it has been generated & is publicly retrievable.
+        if (quotation.getPdfPath() != null) {
+            sendDocumentMessage(lead, quotation, quotation.getPdfPath());
+        }
+
+        return textMsg;
+    }
+
+    public WhatsAppMessage sendAcceptanceConfirmation(Lead lead) {
+        String body = "Thank you for accepting our quotation! \uD83C\uDF89\n\nOur team will contact you shortly to confirm your order.";
+        return sendTextMessage(lead, WhatsAppMessageType.ACCEPTANCE_CONFIRMATION, body);
+    }
+
+    public WhatsAppMessage sendContactDetails(Lead lead) {
+        String body = String.format("Phone: %s%nEmail: %s", companyProperties.getPhone(), companyProperties.getEmail());
+        return sendTextMessage(lead, WhatsAppMessageType.CONTACT_DETAILS, body);
+    }
+
+    public WhatsAppMessage sendFollowUpMessage(Lead lead, String customText) {
+        return sendTextMessage(lead, WhatsAppMessageType.FOLLOW_UP, customText);
+    }
+
+    // ---- Internal plumbing -------------------------------------------------
+
+    private WhatsAppMessage sendTextMessage(Lead lead, WhatsAppMessageType type, String body) {
+        WhatsAppMessage message = WhatsAppMessage.builder()
+                .lead(lead)
+                .type(type)
+                .toPhone(lead.getPhone())
+                .payloadSummary(body.length() > 500 ? body.substring(0, 500) : body)
+                .deliveryStatus(MessageDeliveryStatus.QUEUED)
+                .build();
+        message = whatsAppMessageRepository.save(message);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", normalizePhone(lead.getPhone()));
+        payload.put("type", "text");
+        payload.put("text", Map.of("preview_url", true, "body", body));
+
+        return dispatch(message, payload);
+    }
+
+    private void sendDocumentMessage(Lead lead, Quotation quotation, String pdfPath) {
+        // In production, host the PDF at a stable HTTPS URL (e.g. an object storage bucket or
+        // GET /api/quotations/{id}/pdf behind a signed link) and reference it here as `link`.
+        String publicPdfUrl = companyProperties.getPublicBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
+
+        WhatsAppMessage message = WhatsAppMessage.builder()
+                .lead(lead)
+                .type(WhatsAppMessageType.QUOTATION)
+                .toPhone(lead.getPhone())
+                .payloadSummary("Quotation PDF: " + quotation.getQuotationNumber())
+                .deliveryStatus(MessageDeliveryStatus.QUEUED)
+                .build();
+        message = whatsAppMessageRepository.save(message);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", normalizePhone(lead.getPhone()));
+        payload.put("type", "document");
+        payload.put("document", Map.of(
+                "link", publicPdfUrl,
+                "filename", new File(pdfPath).getName()
+        ));
+
+        dispatch(message, payload);
+    }
+
+    private WhatsAppMessage dispatch(WhatsAppMessage message, Map<String, Object> payload) {
+        String url = whatsAppProperties.graphBaseUrl() + "/" + whatsAppProperties.getPhoneNumberId() + "/messages";
+        try {
+            Map<String, Object> response = webClient.post()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + whatsAppProperties.getAccessToken())
+                    .header("Content-Type", "application/json")
+                    .bodyValue(payload)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            String wamid = extractMessageId(response);
+            message.setProviderMessageId(wamid);
+            message.setDeliveryStatus(MessageDeliveryStatus.SENT);
+            message.setSentAt(java.time.LocalDateTime.now());
+            return whatsAppMessageRepository.save(message);
+
+        } catch (Exception ex) {
+            log.error("WhatsApp API call failed for lead {}: {}", message.getLead().getLeadCode(), ex.getMessage());
+            message.setDeliveryStatus(MessageDeliveryStatus.FAILED);
+            message.setErrorMessage(ex.getMessage());
+            message.setRetryCount(message.getRetryCount() + 1);
+            whatsAppMessageRepository.save(message);
+            // Intentionally do not rethrow further up as a fatal error for the whole workflow;
+            // callers decide whether to surface this to the employee for manual retry.
+            throw new WhatsAppApiException("Failed to send WhatsApp message: " + ex.getMessage(), ex);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractMessageId(Map<String, Object> response) {
+        try {
+            List<Map<String, Object>> messages = (List<Map<String, Object>>) response.get("messages");
+            return messages.get(0).get("id").toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String normalizePhone(String phone) {
+        return phone.replace("+", "").replace(" ", "").replace("-", "");
+    }
+
+    /** Allows an employee to retry a previously failed message from the dashboard. */
+    public WhatsAppMessage retry(WhatsAppMessage failedMessage) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", normalizePhone(failedMessage.getToPhone()));
+        payload.put("type", "text");
+        payload.put("text", Map.of("preview_url", true, "body", failedMessage.getPayloadSummary()));
+        return dispatch(failedMessage, payload);
+    }
+}

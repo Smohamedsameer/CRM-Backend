@@ -1,0 +1,135 @@
+{
+  "groups": [
+    {
+      "name": "app",
+      "type": "com.leadquote.config.AppProperties",
+      "sourceType": "com.leadquote.config.AppProperties"
+    },
+    {
+      "name": "company",
+      "type": "com.leadquote.config.CompanyProperties",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "pricing",
+      "type": "com.leadquote.service.PricingRules",
+      "sourceType": "com.leadquote.service.PricingRules"
+    },
+    {
+      "name": "whatsapp",
+      "type": "com.leadquote.config.WhatsAppProperties",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "app.enquiry-token-validity-hours",
+      "type": "java.lang.Integer",
+      "description": "Hours an enquiry-form link stays valid.",
+      "sourceType": "com.leadquote.config.AppProperties"
+    },
+    {
+      "name": "app.pdf-storage-dir",
+      "type": "java.lang.String",
+      "description": "Directory where generated quotation PDFs are stored.",
+      "sourceType": "com.leadquote.config.AppProperties"
+    },
+    {
+      "name": "app.quotation-validity-days",
+      "type": "java.lang.Integer",
+      "description": "Days a quotation acceptance link \/ quotation itself stays valid.",
+      "sourceType": "com.leadquote.config.AppProperties"
+    },
+    {
+      "name": "company.address",
+      "type": "java.lang.String",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "company.email",
+      "type": "java.lang.String",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "company.gst-number",
+      "type": "java.lang.String",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "company.logo-path",
+      "type": "java.lang.String",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "company.name",
+      "type": "java.lang.String",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "company.phone",
+      "type": "java.lang.String",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "company.public-base-url",
+      "type": "java.lang.String",
+      "description": "Public base URL of the deployed frontend, e.g. https:\/\/yourdomain.com",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
+      "name": "pricing.default-additional-charges",
+      "type": "java.math.BigDecimal",
+      "description": "Flat additional charges applied to every quotation (installation, logistics, etc.)",
+      "sourceType": "com.leadquote.service.PricingRules"
+    },
+    {
+      "name": "pricing.default-discount-percentage",
+      "type": "java.math.BigDecimal",
+      "description": "Default discount percentage (0-100) applied unless overridden per-quotation.",
+      "sourceType": "com.leadquote.service.PricingRules"
+    },
+    {
+      "name": "pricing.default-tax-percentage",
+      "type": "java.math.BigDecimal",
+      "description": "Default tax percentage (e.g. GST 18).",
+      "sourceType": "com.leadquote.service.PricingRules"
+    },
+    {
+      "name": "pricing.rate-per-square-foot",
+      "type": "java.math.BigDecimal",
+      "description": "Default rate per square foot, used when the enquiry doesn't specify explicit line items.",
+      "sourceType": "com.leadquote.service.PricingRules"
+    },
+    {
+      "name": "whatsapp.access-token",
+      "type": "java.lang.String",
+      "description": "WHATSAPP_ACCESS_TOKEN",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.api-version",
+      "type": "java.lang.String",
+      "description": "WHATSAPP_API_VERSION, e.g. v20.0",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.business-account-id",
+      "type": "java.lang.String",
+      "description": "WHATSAPP_BUSINESS_ACCOUNT_ID",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.phone-number-id",
+      "type": "java.lang.String",
+      "description": "WHATSAPP_PHONE_NUMBER_ID",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.webhook-verify-token",
+      "type": "java.lang.String",
+      "description": "Shared secret used to validate incoming webhook verify requests (WHATSAPP_WEBHOOK_VERIFY_TOKEN)",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    }
+  ],
+  "hints": []
+}
