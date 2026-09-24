@@ -18,6 +18,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.awt.Color;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 
 @Service
@@ -128,10 +130,9 @@ public class PdfService {
         table.setSpacingBefore(5);
 
         addPlainRow(table, "Quotation No:", quotation.getQuotationNumber());
-        addPlainRow(table, "Date:", quotation.getCreatedAt().format(DateTimeFormatter.ofPattern("dd MMM yyyy")));
+        addPlainRow(table, "Quotation Created Date:", quotation.getCreatedAt().format(DateTimeFormatter.ofPattern("dd MMM yyyy")));
         addPlainRow(table, "Valid Until:", quotation.getValidUntil() != null
                 ? quotation.getValidUntil().format(DateTimeFormatter.ofPattern("dd MMM yyyy")) : "-");
-        addPlainRow(table, "Status:", quotation.getStatus().name());
 
         document.add(table);
         document.add(Chunk.NEWLINE);
@@ -145,7 +146,6 @@ public class PdfService {
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(100);
         table.setSpacingBefore(5);
-        addPlainRow(table, "Name:", quotation.getCustomerName());
         addPlainRow(table, "Company:", nullToEmpty(quotation.getCompanyName()));
         addPlainRow(table, "Phone:", lead.getPhone());
         addPlainRow(table, "Email:", nullToEmpty(lead.getEmail()));
@@ -233,11 +233,16 @@ public class PdfService {
         return sb.toString();
     }
 
+    /**
+     * Rather than showing GST as its own line item, each product's displayed unit price and
+     * amount are shown inclusive of its proportional share of the quotation's total GST. There
+     * is no separate "GST" column/section in the table.
+     */
     private void addItemsTable(Document document, Quotation quotation) throws DocumentException {
         Paragraph title = new Paragraph("Items", HEADER_FONT);
         document.add(title);
 
-        PdfPTable table = new PdfPTable(new float[]{4f, 1.2f, 1.5f, 1.5f});
+        PdfPTable table = new PdfPTable(new float[]{4f, 1.2f, 1.7f, 1.7f});
         table.setWidthPercentage(100);
         table.setSpacingBefore(5);
 
@@ -246,26 +251,66 @@ public class PdfService {
         addHeaderCell(table, "Unit Price");
         addHeaderCell(table, "Amount");
 
-        for (QuotationItem item : quotation.getItems()) {
+        BigDecimal subtotal = quotation.getSubtotal() != null ? quotation.getSubtotal() : BigDecimal.ZERO;
+        BigDecimal tax = quotation.getTax() != null ? quotation.getTax() : BigDecimal.ZERO;
+        boolean hasTax = tax.compareTo(BigDecimal.ZERO) != 0 && subtotal.compareTo(BigDecimal.ZERO) != 0;
+
+        BigDecimal allocatedTax = BigDecimal.ZERO;
+        java.util.List<QuotationItem> items = quotation.getItems();
+        for (int i = 0; i < items.size(); i++) {
+            QuotationItem item = items.get(i);
+            BigDecimal amount = item.getAmount() != null ? item.getAmount() : BigDecimal.ZERO;
+
+            BigDecimal taxShare = BigDecimal.ZERO;
+            if (hasTax) {
+                boolean isLastItem = i == items.size() - 1;
+                if (isLastItem) {
+                    // Give the last item the remainder so item amounts always sum exactly to subtotal + tax.
+                    taxShare = tax.subtract(allocatedTax);
+                } else {
+                    taxShare = amount.multiply(tax).divide(subtotal, 2, RoundingMode.HALF_UP);
+                    allocatedTax = allocatedTax.add(taxShare);
+                }
+            }
+
+            BigDecimal amountInclTax = amount.add(taxShare).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal unitPriceInclTax = (item.getQuantity() != null && item.getQuantity() != 0)
+                    ? amountInclTax.divide(BigDecimal.valueOf(item.getQuantity()), 2, RoundingMode.HALF_UP)
+                    : amountInclTax;
+
             table.addCell(cell(item.getDescription()));
             table.addCell(cell(item.getQuantity() != null ? String.valueOf(item.getQuantity()) : "-"));
-            table.addCell(cell(item.getUnitPrice() != null ? item.getUnitPrice().toString() : "-"));
-            table.addCell(cell(item.getAmount() != null ? item.getAmount().toString() : "-"));
+            table.addCell(cell(unitPriceInclTax.toString()));
+            table.addCell(cell(amountInclTax.toString()));
         }
 
         document.add(table);
+        if (hasTax) {
+            Paragraph note = new Paragraph("Prices shown are inclusive of applicable GST (GSTIN: "
+                    + nullToEmpty(companyProperties.getGstNumber()) + ").", SMALL_FONT);
+            document.add(note);
+        }
         document.add(Chunk.NEWLINE);
     }
 
+    /**
+     * Only shows a Discount line when the admin actually applied one while generating the
+     * quotation; otherwise the PDF shows a single Grand Total line, with GST already folded
+     * into the item amounts above.
+     */
     private void addTotals(Document document, Quotation quotation) throws DocumentException {
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(50);
         table.setHorizontalAlignment(Element.ALIGN_RIGHT);
         table.setSpacingBefore(5);
 
-        addPlainRow(table, "Subtotal:", quotation.getSubtotal().toString());
-        addPlainRow(table, "Discount:", quotation.getDiscount().toString());
-        addPlainRow(table, "Tax:", quotation.getTax().toString());
+        BigDecimal discount = quotation.getDiscount() != null ? quotation.getDiscount() : BigDecimal.ZERO;
+        if (discount.compareTo(BigDecimal.ZERO) != 0) {
+            BigDecimal subtotal = quotation.getSubtotal() != null ? quotation.getSubtotal() : BigDecimal.ZERO;
+            BigDecimal tax = quotation.getTax() != null ? quotation.getTax() : BigDecimal.ZERO;
+            addPlainRow(table, "Total:", subtotal.add(tax).setScale(2, RoundingMode.HALF_UP).toString());
+            addPlainRow(table, "Discount:", "-" + discount.toString());
+        }
 
         PdfPCell grandLabel = new PdfPCell(new Phrase("Grand Total:", HEADER_FONT));
         grandLabel.setBorder(Rectangle.TOP);

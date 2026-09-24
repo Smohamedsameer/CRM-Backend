@@ -37,6 +37,7 @@ public class QuotationService {
     private final CompanyProperties companyProperties;
     private final AppProperties appProperties;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -212,7 +213,13 @@ public class QuotationService {
         auditService.log("Quotation", saved.getId(), "CHANGES_REQUESTED",
                 "Customer requested changes: " + request.getNotes());
 
-        // NOTE: wire this into your notification-to-employee channel (email/Slack/in-app)
+        notificationService.create(
+                NotificationType.CHANGES_REQUESTED,
+                "Changes requested",
+                saved.getLead().getCustomerName() + " requested changes to quotation " + saved.getQuotationNumber()
+                        + (request.getNotes() != null && !request.getNotes().isBlank() ? ": " + request.getNotes() : ""),
+                "Lead", saved.getLead().getId(), "/leads/" + saved.getLead().getId());
+
         return saved;
     }
 
@@ -236,10 +243,11 @@ public class QuotationService {
                 .orElseThrow(() -> new NotFoundException("Quotation not found: " + id));
     }
 
+    /** Format: SE-1001-2026 (company prefix - running sequence starting at 1001 - year issued). */
     private synchronized String nextQuotationNumber() {
-        String prefix = "QT-" + Year.now().getValue() + "-";
-        long count = quotationRepository.countByQuotationNumberStartingWith(prefix) + 1;
-        return prefix + String.format("%04d", count);
+        String prefix = "SE-";
+        long sequence = 1000 + quotationRepository.countByQuotationNumberStartingWith(prefix) + 1;
+        return prefix + sequence + "-" + Year.now().getValue();
     }
 
     private String generateSecureToken() {

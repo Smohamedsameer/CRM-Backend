@@ -4,6 +4,7 @@ import com.leadquote.dto.EnquirySubmitRequest;
 import com.leadquote.entity.Enquiry;
 import com.leadquote.entity.Lead;
 import com.leadquote.entity.LeadStatus;
+import com.leadquote.entity.NotificationType;
 import com.leadquote.repository.EnquiryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ public class EnquiryService {
     private final EnquiryRepository enquiryRepository;
     private final LeadService leadService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Transactional
     public Enquiry submit(EnquirySubmitRequest request) {
@@ -61,6 +63,12 @@ public class EnquiryService {
         lead.setStatus(LeadStatus.FORM_SUBMITTED);
 
         auditService.log("Enquiry", saved.getId(), "FORM_SUBMITTED", "Enquiry submitted for lead " + lead.getLeadCode());
+
+        notificationService.create(
+                NotificationType.ENQUIRY_SUBMITTED,
+                "New enquiry submitted",
+                lead.getCustomerName() + " (" + lead.getLeadCode() + ") submitted the enquiry form",
+                "Lead", lead.getId(), "/leads/" + lead.getId());
 
         return saved;
     }
