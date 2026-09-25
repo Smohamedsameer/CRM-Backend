@@ -125,9 +125,21 @@
       "sourceType": "com.leadquote.config.WhatsAppProperties"
     },
     {
+      "name": "whatsapp.template-language",
+      "type": "java.lang.String",
+      "description": "Language code the template was approved under, e.g. en_US or en (WHATSAPP_TEMPLATE_LANGUAGE).",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
       "name": "whatsapp.webhook-verify-token",
       "type": "java.lang.String",
       "description": "Shared secret used to validate incoming webhook verify requests (WHATSAPP_WEBHOOK_VERIFY_TOKEN)",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.welcome-template-name",
+      "type": "java.lang.String",
+      "description": "Name of the approved template used for the first-ever message to a new customer (WHATSAPP_WELCOME_TEMPLATE_NAME). WhatsApp requires business-initiated messages outside an open 24h customer session to use an approved template, not free text.",
       "sourceType": "com.leadquote.config.WhatsAppProperties"
     }
   ],
