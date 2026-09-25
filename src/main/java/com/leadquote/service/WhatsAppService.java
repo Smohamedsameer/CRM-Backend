@@ -181,15 +181,38 @@ public class WhatsAppService {
             return whatsAppMessageRepository.save(message);
 
         } catch (Exception ex) {
-            log.error("WhatsApp API call failed for lead {}: {}", message.getLead().getLeadCode(), ex.getMessage());
+            String reason = extractErrorReason(ex);
+            log.error("WhatsApp API call failed for lead {}: {}", message.getLead().getLeadCode(), reason);
             message.setDeliveryStatus(MessageDeliveryStatus.FAILED);
-            message.setErrorMessage(ex.getMessage());
+            message.setErrorMessage(reason);
             message.setRetryCount(message.getRetryCount() + 1);
             whatsAppMessageRepository.save(message);
             // Intentionally do not rethrow further up as a fatal error for the whole workflow;
             // callers decide whether to surface this to the employee for manual retry.
-            throw new WhatsAppApiException("Failed to send WhatsApp message: " + ex.getMessage(), ex);
+            throw new WhatsAppApiException("Failed to send WhatsApp message: " + reason, ex);
         }
+    }
+
+    /**
+     * WebClientResponseException#getMessage() only gives a generic "404 Not Found from POST ..."
+     * string by default - the actually useful part (why Meta rejected it, e.g. "template is
+     * paused"/"not approved") is in the response body, which this pulls out when present.
+     */
+    private String extractErrorReason(Exception ex) {
+        if (ex instanceof org.springframework.web.reactive.function.client.WebClientResponseException wcre) {
+            String bodyJson = wcre.getResponseBodyAsString();
+            try {
+                Map<String, Object> body = objectMapper.readValue(bodyJson, Map.class);
+                Object error = body.get("error");
+                if (error instanceof Map<?, ?> errorMap) {
+                    Object msg = errorMap.get("error_user_msg") != null ? errorMap.get("error_user_msg") : errorMap.get("message");
+                    if (msg != null) return msg.toString();
+                }
+            } catch (Exception parseFailure) {
+                if (bodyJson != null && !bodyJson.isBlank()) return bodyJson;
+            }
+        }
+        return ex.getMessage();
     }
 
     @SuppressWarnings("unchecked")
