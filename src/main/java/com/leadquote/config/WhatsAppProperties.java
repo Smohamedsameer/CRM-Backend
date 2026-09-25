@@ -20,6 +20,12 @@ public class WhatsAppProperties {
     private String apiVersion = "v20.0";
     /** Shared secret used to validate incoming webhook verify requests (WHATSAPP_WEBHOOK_VERIFY_TOKEN) */
     private String webhookVerifyToken;
+    /** Name of the approved template used for the first-ever message to a new customer
+     * (WHATSAPP_WELCOME_TEMPLATE_NAME). WhatsApp requires business-initiated messages outside an
+     * open 24h customer session to use an approved template, not free text. */
+    private String welcomeTemplateName = "welcome_enquiry";
+    /** Language code the template was approved under, e.g. en_US or en (WHATSAPP_TEMPLATE_LANGUAGE). */
+    private String templateLanguage = "en_US";
 
     public String graphBaseUrl() {
         return "https://graph.facebook.com/" + apiVersion;

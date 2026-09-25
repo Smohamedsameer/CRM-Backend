@@ -42,6 +42,11 @@ public class WhatsAppMessage {
     @Column(length = 2000)
     private String errorMessage;
 
+    /** Exact JSON payload sent to the Graph API /messages endpoint, so a retry can replay it
+     * verbatim (template messages, document messages, etc.) instead of being rebuilt as plain text. */
+    @Column(columnDefinition = "TEXT")
+    private String requestPayload;
+
     private int retryCount;
 
     private LocalDateTime sentAt;
