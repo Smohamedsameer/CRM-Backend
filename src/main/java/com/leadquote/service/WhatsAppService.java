@@ -37,12 +37,43 @@ public class WhatsAppService {
     private final ObjectMapper objectMapper;
 
     /**
-     * The first-ever message to a new customer must be an approved WhatsApp Message Template,
-     * not free text - WhatsApp rejects (or silently fails to deliver) business-initiated text
-     * messages sent outside an open 24h customer session. Requires an approved template named
-     * whatsapp.welcome-template-name with 3 body variables: customer name, company name, link.
+     * Sends the welcome message as plain free text. Note: WhatsApp's own policy is that the
+     * first-ever message to a customer who hasn't messaged you first is supposed to use an
+     * approved Message Template, not free text - sending free text here can be rejected or
+     * silently undelivered for a brand-new contact. This reverts to text-only per request;
+     * see sendWelcomeMessageViaTemplate() below (currently unused) if you want to switch back.
      */
     public WhatsAppMessage sendWelcomeMessage(Lead lead, String enquiryFormLink) {
+        String body = String.format(
+                "Hello %s \uD83D\uDC4B%n%nThank you for your enquiry with %s.%n%n" +
+                "To understand your requirements and prepare an accurate quotation, please complete our short enquiry form.%n%n" +
+                "Please click the link below:%n%n%s%n%nThank you.",
+                lead.getCustomerName(), companyProperties.getName(), enquiryFormLink);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", normalizePhone(lead.getPhone()));
+        payload.put("type", "text");
+        payload.put("text", Map.of("preview_url", true, "body", body));
+
+        WhatsAppMessage message = WhatsAppMessage.builder()
+                .lead(lead)
+                .type(WhatsAppMessageType.WELCOME)
+                .toPhone(lead.getPhone())
+                .payloadSummary(body.length() > 500 ? body.substring(0, 500) : body)
+                .deliveryStatus(MessageDeliveryStatus.QUEUED)
+                .build();
+        message = whatsAppMessageRepository.save(message);
+
+        return dispatch(message, payload);
+    }
+
+    /**
+     * Template-based version, kept here unused in case the welcome_enquiry template gets
+     * approved later and you want to switch back - just rename this to sendWelcomeMessage and
+     * rename the plain-text one above to something else.
+     */
+    public WhatsAppMessage sendWelcomeMessageViaTemplate(Lead lead, String enquiryFormLink) {
         String readableSummary = String.format(
                 "Hello %s \uD83D\uDC4B%n%nThank you for your enquiry with %s.%n%n" +
                 "To understand your requirements and prepare an accurate quotation, please complete our short enquiry form.%n%n" +
