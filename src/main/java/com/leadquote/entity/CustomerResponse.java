@@ -31,6 +31,11 @@ public class CustomerResponse {
     @Column(length = 2000)
     private String changeRequestNotes;
 
+    /** The admin's WhatsApp reply text, set once someone answers this request from the Client Request page. */
+    @Column(length = 2000)
+    private String adminReply;
+    private LocalDateTime repliedAt;
+
     private LocalDateTime createdAt;
 
     @PrePersist
