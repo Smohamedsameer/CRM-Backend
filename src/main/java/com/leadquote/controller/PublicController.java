@@ -10,7 +10,6 @@ import com.leadquote.service.LeadService;
 import com.leadquote.service.QuotationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -70,13 +69,16 @@ public class PublicController {
     }
 
     @GetMapping("/quotations/{token}/pdf")
-    public ResponseEntity<FileSystemResource> downloadPdf(@PathVariable String token) {
-        Quotation q = quotationService.getByPublicToken(token);
-        FileSystemResource resource = new FileSystemResource(q.getPdfPath());
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable String token) throws java.io.IOException {
+        Quotation q = quotationService.getByPublicTokenForPdf(token);
+        byte[] bytes = java.nio.file.Files.readAllBytes(quotationService.ensurePdfFile(q).toPath());
+        String fileName = q.getQuotationNumber().replace("/", "-") + ".pdf";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + q.getQuotationNumber() + ".pdf\"")
-                .body(resource);
+                .contentLength(bytes.length)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(bytes);
     }
 
     @PostMapping("/quotations/{token}/accept")

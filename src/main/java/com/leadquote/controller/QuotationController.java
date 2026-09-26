@@ -6,7 +6,6 @@ import com.leadquote.entity.Quotation;
 import com.leadquote.service.LeadService;
 import com.leadquote.service.QuotationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -40,12 +39,15 @@ public class QuotationController {
     /** Lets a logged-in employee review any quotation's PDF, regardless of status - the public
      * PDF link (/api/public/quotations/{token}/pdf) only works for the customer's own token. */
     @GetMapping("/{id}/pdf")
-    public ResponseEntity<FileSystemResource> downloadPdf(@PathVariable Long id) {
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable Long id) throws java.io.IOException {
         Quotation quotation = quotationService.getById(id);
-        FileSystemResource resource = new FileSystemResource(quotation.getPdfPath());
+        byte[] bytes = java.nio.file.Files.readAllBytes(quotationService.ensurePdfFile(quotation).toPath());
+        String fileName = quotation.getQuotationNumber().replace("/", "-") + ".pdf";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + quotation.getQuotationNumber() + ".pdf\"")
-                .body(resource);
+                .contentLength(bytes.length)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(bytes);
     }
 }

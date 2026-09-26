@@ -140,6 +140,8 @@ public class QuotationService {
     @Transactional
     public Quotation sendQuotation(Quotation quotation) {
         String quotationPageLink = companyProperties.getPublicBaseUrl() + "/quotation/" + quotation.getSecureToken();
+        // Make sure the PDF really exists on disk before WhatsApp tries to download it.
+        ensurePdfFile(quotation);
         whatsAppService.sendQuotation(quotation.getLead(), quotation, quotationPageLink);
 
         quotation.setStatus(QuotationStatus.SENT);
@@ -167,6 +169,20 @@ public class QuotationService {
             quotationRepository.save(quotation);
         }
 
+        return quotation;
+    }
+
+    /**
+     * Token check for the PDF download only. Deliberately does NOT mark the quotation as VIEWED:
+     * WhatsApp's own servers download this file when the message is sent, which would otherwise
+     * flip the status to "Viewed" before the customer has even opened it.
+     */
+    public Quotation getByPublicTokenForPdf(String token) {
+        Quotation quotation = quotationRepository.findBySecureToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Invalid quotation link"));
+        if (quotation.getTokenExpiresAt() != null && quotation.getTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ExpiredTokenException("This quotation link has expired");
+        }
         return quotation;
     }
 
@@ -236,6 +252,23 @@ public class QuotationService {
             throw new IllegalStateException("This quotation has already been responded to");
         }
         return quotation;
+    }
+
+    /**
+     * Returns the quotation's PDF file, regenerating it if it is missing. Railway (and most PaaS
+     * hosts) wipe the local disk on every redeploy, so an old quotation's PDF may no longer exist.
+     */
+    @Transactional
+    public java.io.File ensurePdfFile(Quotation quotation) {
+        String path = quotation.getPdfPath();
+        if (path != null) {
+            java.io.File f = new java.io.File(path);
+            if (f.exists() && f.length() > 0) return f;
+        }
+        String regenerated = pdfService.generateQuotationPdf(quotation);
+        quotation.setPdfPath(regenerated);
+        quotationRepository.save(quotation);
+        return new java.io.File(regenerated);
     }
 
     public Quotation getById(Long id) {

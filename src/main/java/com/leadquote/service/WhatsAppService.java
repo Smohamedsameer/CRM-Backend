@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,9 +102,10 @@ public class WhatsAppService {
     }
 
     private void sendDocumentMessage(Lead lead, Quotation quotation, String pdfPath) {
-        // In production, host the PDF at a stable HTTPS URL (e.g. an object storage bucket or
-        // GET /api/quotations/{id}/pdf behind a signed link) and reference it here as `link`.
-        String publicPdfUrl = companyProperties.getPublicBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
+        // The PDF MUST be fetched from the backend. The frontend host (Vercel/Netlify) rewrites every
+        // unknown path to index.html, so WhatsApp would download HTML and save it as "xxx.pdf.html".
+        String publicPdfUrl = resolveBackendBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
+        String fileName = quotation.getQuotationNumber().replace("/", "-") + ".pdf";
 
         WhatsAppMessage message = WhatsAppMessage.builder()
                 .lead(lead)
@@ -122,10 +122,52 @@ public class WhatsAppService {
         payload.put("type", "document");
         payload.put("document", Map.of(
                 "link", publicPdfUrl,
-                "filename", new File(pdfPath).getName()
+                "filename", fileName,
+                "caption", "Quotation " + quotation.getQuotationNumber()
         ));
 
+        log.info("Sending quotation PDF {} to WhatsApp from {}", fileName, publicPdfUrl);
         dispatch(message, payload);
+    }
+
+    /**
+     * Public base URL of this backend, in order of preference:
+     * 1. company.api-base-url (env COMPANY_API_BASE_URL)
+     * 2. RAILWAY_PUBLIC_DOMAIN (set automatically by Railway)
+     * 3. the URL of the current HTTP request (the admin clicked "Send", so it hit the backend)
+     * 4. company.public-base-url as a last resort
+     */
+    private String resolveBackendBaseUrl() {
+        String configured = companyProperties.getApiBaseUrl();
+        if (configured != null && !configured.isBlank()) return withScheme(configured);
+
+        String railway = System.getenv("RAILWAY_PUBLIC_DOMAIN");
+        if (railway != null && !railway.isBlank()) return withScheme(railway);
+
+        try {
+            String fromRequest = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                    .fromCurrentContextPath().build().toUriString();
+            if (fromRequest != null && !fromRequest.isBlank()) {
+                if (fromRequest.startsWith("http://") && !fromRequest.contains("localhost")
+                        && !fromRequest.contains("127.0.0.1")) {
+                    fromRequest = "https://" + fromRequest.substring("http://".length());
+                }
+                return stripSlash(fromRequest);
+            }
+        } catch (IllegalStateException noRequest) {
+            // Not inside an HTTP request (e.g. a scheduled job) - fall through.
+        }
+        return stripSlash(companyProperties.getPublicBaseUrl());
+    }
+
+    private static String withScheme(String url) {
+        String u = url.trim();
+        if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
+        return stripSlash(u);
+    }
+
+    private static String stripSlash(String url) {
+        return url != null && url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     private WhatsAppMessage dispatch(WhatsAppMessage message, Map<String, Object> payload) {

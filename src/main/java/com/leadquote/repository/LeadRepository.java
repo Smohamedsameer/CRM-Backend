@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface LeadRepository extends JpaRepository<Lead, Long> {
@@ -27,4 +29,14 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     Page<Lead> search(@Param("status") LeadStatus status, @Param("search") String search, Pageable pageable);
 
     long countByStatus(LeadStatus status);
+
+    // ---- Dashboard analytics ----
+    @Query("select l.status, count(l) from Lead l group by l.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("select l.source, count(l) from Lead l group by l.source")
+    List<Object[]> countGroupedBySource();
+
+    @Query("select l.createdAt from Lead l where l.createdAt >= :from")
+    List<LocalDateTime> findCreatedAtSince(@Param("from") LocalDateTime from);
 }
