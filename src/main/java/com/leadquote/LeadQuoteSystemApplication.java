@@ -1,4 +1,5 @@
 package com.leadquote;
+
 import java.util.TimeZone;
 
 import org.springframework.boot.SpringApplication;
@@ -11,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class LeadQuoteSystemApplication {
     public static void main(String[] args) {
-         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));
+    	 TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));
         SpringApplication.run(LeadQuoteSystemApplication.class, args);
     }
 }

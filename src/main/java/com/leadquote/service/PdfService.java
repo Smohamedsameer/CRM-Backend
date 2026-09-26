@@ -28,6 +28,7 @@ public class PdfService {
 
     private final CompanyProperties companyProperties;
     private final AppProperties appProperties;
+    private final SettingsService settingsService;
 
     private static final Font TITLE_FONT = new Font(Font.HELVETICA, 20, Font.BOLD);
     private static final Font HEADER_FONT = new Font(Font.HELVETICA, 11, Font.BOLD);
@@ -64,10 +65,10 @@ public class PdfService {
     private void addHeader(Document document) throws DocumentException {
         Paragraph details = new Paragraph();
         details.setFont(NORMAL_FONT);
-        details.add(nullToEmpty(companyProperties.getAddress()) + "\n");
-        details.add("Phone: " + nullToEmpty(companyProperties.getPhone()) + "  |  Email: " + nullToEmpty(companyProperties.getEmail()) + "\n");
-        if (companyProperties.getGstNumber() != null && !companyProperties.getGstNumber().isBlank()) {
-            details.add("GSTIN: " + companyProperties.getGstNumber() + "\n");
+        details.add(nullToEmpty(settingsService.getCompanyAddress()) + "\n");
+        details.add("Phone: " + nullToEmpty(settingsService.getCompanyPhone()) + "  |  Email: " + nullToEmpty(settingsService.getCompanyEmail()) + "\n");
+        if (settingsService.getCompanyGstNumber() != null && !settingsService.getCompanyGstNumber().isBlank()) {
+            details.add("GSTIN: " + settingsService.getCompanyGstNumber() + "\n");
         }
 
         Image logo = loadLogo();
@@ -83,13 +84,13 @@ public class PdfService {
 
             PdfPCell textCell = new PdfPCell();
             textCell.setBorder(Rectangle.NO_BORDER);
-            textCell.addElement(new Paragraph(companyProperties.getName(), TITLE_FONT));
+            textCell.addElement(new Paragraph(settingsService.getCompanyName(), TITLE_FONT));
             textCell.addElement(details);
             headerTable.addCell(textCell);
 
             document.add(headerTable);
         } else {
-            document.add(new Paragraph(companyProperties.getName(), TITLE_FONT));
+            document.add(new Paragraph(settingsService.getCompanyName(), TITLE_FONT));
             document.add(details);
         }
 
@@ -287,7 +288,7 @@ public class PdfService {
         document.add(table);
         if (hasTax) {
             Paragraph note = new Paragraph("Prices shown are inclusive of applicable GST (GSTIN: "
-                    + nullToEmpty(companyProperties.getGstNumber()) + ").", SMALL_FONT);
+                    + nullToEmpty(settingsService.getCompanyGstNumber()) + ").", SMALL_FONT);
             document.add(note);
         }
         document.add(Chunk.NEWLINE);

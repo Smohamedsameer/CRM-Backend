@@ -31,7 +31,7 @@ public class QuotationService {
 
     private final QuotationRepository quotationRepository;
     private final CustomerResponseRepository customerResponseRepository;
-    private final PricingRules pricingRules;
+    private final SettingsService settingsService;
     private final PdfService pdfService;
     private final WhatsAppService whatsAppService;
     private final CompanyProperties companyProperties;
@@ -63,12 +63,12 @@ public class QuotationService {
 
         BigDecimal discount = request != null && request.getDiscount() != null
                 ? request.getDiscount()
-                : subtotal.multiply(pricingRules.getDefaultDiscountPercentage())
+                : subtotal.multiply(settingsService.getDefaultDiscountPercentage())
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
         BigDecimal taxPercentage = request != null && request.getTaxPercentage() != null
                 ? request.getTaxPercentage()
-                : pricingRules.getDefaultTaxPercentage();
+                : settingsService.getDefaultTaxPercentage();
 
         BigDecimal taxableAmount = subtotal.subtract(discount);
         BigDecimal tax = taxableAmount.multiply(taxPercentage)
@@ -113,7 +113,7 @@ public class QuotationService {
 
         // Default: derive a single line item from square footage × configurable rate per sqft.
         double sqft = lead.getSquareFeet() != null ? lead.getSquareFeet() : 0d;
-        BigDecimal rate = pricingRules.getRatePerSquareFoot();
+        BigDecimal rate = settingsService.getRatePerSquareFoot();
         BigDecimal amount = rate.multiply(BigDecimal.valueOf(sqft)).setScale(2, RoundingMode.HALF_UP);
 
         QuotationItem defaultItem = QuotationItem.builder()
@@ -124,13 +124,13 @@ public class QuotationService {
                 .amount(amount)
                 .build();
 
-        if (pricingRules.getDefaultAdditionalCharges().compareTo(BigDecimal.ZERO) > 0) {
+        if (settingsService.getDefaultAdditionalCharges().compareTo(BigDecimal.ZERO) > 0) {
             QuotationItem additional = QuotationItem.builder()
                     .quotation(quotation)
                     .description("Additional charges")
                     .quantity(1d)
-                    .unitPrice(pricingRules.getDefaultAdditionalCharges())
-                    .amount(pricingRules.getDefaultAdditionalCharges())
+                    .unitPrice(settingsService.getDefaultAdditionalCharges())
+                    .amount(settingsService.getDefaultAdditionalCharges())
                     .build();
             return new ArrayList<>(List.of(defaultItem, additional));
         }
