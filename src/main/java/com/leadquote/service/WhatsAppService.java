@@ -1,5 +1,7 @@
 package com.leadquote.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadquote.config.CompanyProperties;
 import com.leadquote.config.WhatsAppProperties;
 import com.leadquote.entity.*;
@@ -10,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +22,15 @@ import java.util.Map;
  * Credentials always come from environment-backed configuration (see WhatsAppProperties),
  * never hard-coded, never sent to the frontend.
  *
- * If a call fails, we persist the failure on the WhatsAppMessage row instead of throwing away
- * the lead/quotation, so an employee can retry manually from the dashboard.
+ * Every business-initiated message uses one of the four Meta-APPROVED "utility" templates
+ * (confirm_util, enquiry_util, order_util, customer_util - see WhatsAppProperties). WhatsApp
+ * requires an approved template for any message sent outside an open 24h customer service
+ * window, and simply rejects a free-text "text" type message in that case - so this service
+ * always sends "type": "template", never "type": "text", for these four flows.
+ *
+ * If a call fails, we persist the failure (and the exact request payload, so a retry can
+ * replay it verbatim) on the WhatsAppMessage row instead of throwing away the lead/quotation,
+ * so an employee can retry manually from the dashboard.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,102 +42,141 @@ public class WhatsAppService {
     private final CompanyProperties companyProperties;
     private final SettingsService settingsService;
     private final WhatsAppMessageRepository whatsAppMessageRepository;
+    private final ObjectMapper objectMapper;
 
+    // =========================================================================
+    // confirm_util - "Hello {{1}} , thank you for your enquiry ... {{2}}" (2 body params:
+    // customer name, enquiry form link). Fired the moment a new lead is created.
+    // =========================================================================
     public WhatsAppMessage sendWelcomeMessage(Lead lead, String enquiryFormLink) {
-        String body = String.format(
-                "Hello %s \uD83D\uDC4B%n%nThank you for your enquiry with %s.%n%n" +
-                "To understand your requirements and prepare an accurate quotation, please complete our short enquiry form.%n%n" +
-                "Please click the link below:%n%n%s%n%nThank you.",
-                lead.getCustomerName(), settingsService.getCompanyName(), enquiryFormLink);
-
-        return sendTextMessage(lead, WhatsAppMessageType.WELCOME, body);
+        List<Map<String, Object>> components = List.of(
+                bodyComponent(lead.getCustomerName(), enquiryFormLink)
+        );
+        String summary = "confirm_util -> " + lead.getCustomerName() + ", " + enquiryFormLink;
+        return sendTemplateMessage(lead, WhatsAppMessageType.WELCOME,
+                whatsAppProperties.getConfirmTemplateName(), components, summary);
     }
 
-    public WhatsAppMessage sendEnquiryForm(Lead lead, String enquiryFormLink) {
-        String body = "Here is your enquiry form link: " + enquiryFormLink;
-        return sendTextMessage(lead, WhatsAppMessageType.ENQUIRY_FORM, body);
-    }
-
+    // =========================================================================
+    // enquiry_util - quotation ready. Body params: customer name, quotation no, amount,
+    // quotation/pdf link. The PDF itself rides as the template's HEADER document parameter
+    // (the template was approved with a document header, per "(pdf file attached)" in the copy).
+    // =========================================================================
     public WhatsAppMessage sendQuotation(Lead lead, Quotation quotation, String quotationPageLink) {
-        String textBody = String.format(
-                "Hello %s,%n%nThank you for providing your requirements.%n%nYour quotation is ready.%n%n" +
-                "Quotation No: %s%nTotal Amount: %s%n%n" +
-                "Please review the attached quotation.%n%n" +
-                "You can accept the quotation or request changes here: %s",
-                lead.getCustomerName(), quotation.getQuotationNumber(), quotation.getTotalAmount(), quotationPageLink);
+        List<Map<String, Object>> components = new ArrayList<>();
 
-        WhatsAppMessage textMsg = sendTextMessage(lead, WhatsAppMessageType.QUOTATION, textBody);
-
-        // Send the PDF document as a follow-up media message, if it has been generated & is publicly retrievable.
         if (quotation.getPdfPath() != null) {
-            sendDocumentMessage(lead, quotation, quotation.getPdfPath());
+            // Same reasoning as before: this MUST be a backend URL, never the frontend host,
+            // or WhatsApp downloads the SPA's index.html instead of the actual PDF.
+            String publicPdfUrl = resolveBackendBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
+            String fileName = quotation.getQuotationNumber().replace("/", "-") + ".pdf";
+            components.add(headerDocumentComponent(publicPdfUrl, fileName));
         }
 
-        return textMsg;
+        components.add(bodyComponent(
+                lead.getCustomerName(),
+                quotation.getQuotationNumber(),
+                String.valueOf(quotation.getTotalAmount()),
+                quotationPageLink
+        ));
+
+        String summary = "enquiry_util -> quotation " + quotation.getQuotationNumber()
+                + ", total " + quotation.getTotalAmount();
+        return sendTemplateMessage(lead, WhatsAppMessageType.QUOTATION,
+                whatsAppProperties.getEnquiryTemplateName(), components, summary);
     }
 
+    // =========================================================================
+    // order_util - customer accepted. Body param: admin/company phone number.
+    // (the email in the approved copy is fixed text inside the template, not a variable)
+    // =========================================================================
     public WhatsAppMessage sendAcceptanceConfirmation(Lead lead) {
-        String body = "Thank you for accepting our quotation! \uD83C\uDF89\n\nOur team will contact you shortly to confirm your order.";
-        return sendTextMessage(lead, WhatsAppMessageType.ACCEPTANCE_CONFIRMATION, body);
+        String adminPhone = settingsService.getCompanyPhone();
+        List<Map<String, Object>> components = List.of(
+                bodyComponent(adminPhone)
+        );
+        String summary = "order_util -> admin phone " + adminPhone;
+        return sendTemplateMessage(lead, WhatsAppMessageType.ACCEPTANCE_CONFIRMATION,
+                whatsAppProperties.getOrderTemplateName(), components, summary);
     }
 
-    public WhatsAppMessage sendContactDetails(Lead lead) {
-        String body = String.format("Phone: %s%nEmail: %s", settingsService.getCompanyPhone(), settingsService.getCompanyEmail());
-        return sendTextMessage(lead, WhatsAppMessageType.CONTACT_DETAILS, body);
+    /**
+     * Kept only so any existing call site still compiles. order_util already carries the phone
+     * number AND the (fixed) company email in one message, so there is nothing left to send here -
+     * do NOT call the Graph API a second time for what is really the same template.
+     */
+    @Deprecated
+    public void sendContactDetails(Lead lead) {
+        log.debug("sendContactDetails() is a no-op - order_util already includes phone + email");
     }
 
-    public WhatsAppMessage sendFollowUpMessage(Lead lead, String customText) {
-        return sendTextMessage(lead, WhatsAppMessageType.FOLLOW_UP, customText);
+    // =========================================================================
+    // customer_util - admin's reply to a customer's "request changes" note.
+    // Body params: customer name, quotation no, admin reply text.
+    // =========================================================================
+    public WhatsAppMessage sendFollowUpMessage(Lead lead, String quotationNumber, String adminReply) {
+        List<Map<String, Object>> components = List.of(
+                bodyComponent(lead.getCustomerName(), quotationNumber, adminReply)
+        );
+        String summary = "customer_util -> quotation " + quotationNumber + ": " + adminReply;
+        return sendTemplateMessage(lead, WhatsAppMessageType.FOLLOW_UP,
+                whatsAppProperties.getCustomerTemplateName(), components, summary);
     }
 
     // ---- Internal plumbing -------------------------------------------------
 
-    private WhatsAppMessage sendTextMessage(Lead lead, WhatsAppMessageType type, String body) {
+    private Map<String, Object> bodyComponent(String... textParams) {
+        List<Map<String, Object>> parameters = new ArrayList<>();
+        for (String p : textParams) {
+            Map<String, Object> param = new HashMap<>();
+            param.put("type", "text");
+            param.put("text", p == null ? "" : p);
+            parameters.add(param);
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("type", "body");
+        body.put("parameters", parameters);
+        return body;
+    }
+
+    private Map<String, Object> headerDocumentComponent(String link, String filename) {
+        Map<String, Object> document = new HashMap<>();
+        document.put("link", link);
+        document.put("filename", filename);
+
+        Map<String, Object> param = new HashMap<>();
+        param.put("type", "document");
+        param.put("document", document);
+
+        Map<String, Object> header = new HashMap<>();
+        header.put("type", "header");
+        header.put("parameters", List.of(param));
+        return header;
+    }
+
+    private WhatsAppMessage sendTemplateMessage(Lead lead, WhatsAppMessageType type, String templateName,
+                                                 List<Map<String, Object>> components, String summary) {
         WhatsAppMessage message = WhatsAppMessage.builder()
                 .lead(lead)
                 .type(type)
                 .toPhone(lead.getPhone())
-                .payloadSummary(body.length() > 500 ? body.substring(0, 500) : body)
+                .payloadSummary(summary.length() > 500 ? summary.substring(0, 500) : summary)
                 .deliveryStatus(MessageDeliveryStatus.QUEUED)
                 .build();
         message = whatsAppMessageRepository.save(message);
 
+        Map<String, Object> template = new HashMap<>();
+        template.put("name", templateName);
+        template.put("language", Map.of("code", whatsAppProperties.getTemplateLanguage()));
+        template.put("components", components);
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("messaging_product", "whatsapp");
         payload.put("to", normalizePhone(lead.getPhone()));
-        payload.put("type", "text");
-        payload.put("text", Map.of("preview_url", true, "body", body));
+        payload.put("type", "template");
+        payload.put("template", template);
 
         return dispatch(message, payload);
-    }
-
-    private void sendDocumentMessage(Lead lead, Quotation quotation, String pdfPath) {
-        // The PDF MUST be fetched from the backend. The frontend host (Vercel/Netlify) rewrites every
-        // unknown path to index.html, so WhatsApp would download HTML and save it as "xxx.pdf.html".
-        String publicPdfUrl = resolveBackendBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
-        String fileName = quotation.getQuotationNumber().replace("/", "-") + ".pdf";
-
-        WhatsAppMessage message = WhatsAppMessage.builder()
-                .lead(lead)
-                .type(WhatsAppMessageType.QUOTATION)
-                .toPhone(lead.getPhone())
-                .payloadSummary("Quotation PDF: " + quotation.getQuotationNumber())
-                .deliveryStatus(MessageDeliveryStatus.QUEUED)
-                .build();
-        message = whatsAppMessageRepository.save(message);
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("messaging_product", "whatsapp");
-        payload.put("to", normalizePhone(lead.getPhone()));
-        payload.put("type", "document");
-        payload.put("document", Map.of(
-                "link", publicPdfUrl,
-                "filename", fileName,
-                "caption", "Quotation " + quotation.getQuotationNumber()
-        ));
-
-        log.info("Sending quotation PDF {} to WhatsApp from {}", fileName, publicPdfUrl);
-        dispatch(message, payload);
     }
 
     /**
@@ -172,6 +221,8 @@ public class WhatsAppService {
 
     private WhatsAppMessage dispatch(WhatsAppMessage message, Map<String, Object> payload) {
         String url = whatsAppProperties.graphBaseUrl() + "/" + whatsAppProperties.getPhoneNumberId() + "/messages";
+        message.setRequestPayload(toJson(payload));
+
         try {
             Map<String, Object> response = webClient.post()
                     .uri(url)
@@ -214,13 +265,35 @@ public class WhatsAppService {
         return phone.replace("+", "").replace(" ", "").replace("-", "");
     }
 
-    /** Allows an employee to retry a previously failed message from the dashboard. */
+    private String toJson(Map<String, Object> payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            log.warn("Could not serialize WhatsApp request payload for storage: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Allows an employee to retry a previously failed message from the dashboard. Replays the
+     * EXACT request payload that was stored at send time (template name, language, header/body
+     * components, ...) rather than rebuilding it, since a template message can't be reconstructed
+     * from payloadSummary alone.
+     */
+    @SuppressWarnings("unchecked")
     public WhatsAppMessage retry(WhatsAppMessage failedMessage) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("messaging_product", "whatsapp");
-        payload.put("to", normalizePhone(failedMessage.getToPhone()));
-        payload.put("type", "text");
-        payload.put("text", Map.of("preview_url", true, "body", failedMessage.getPayloadSummary()));
+        if (failedMessage.getRequestPayload() == null) {
+            throw new WhatsAppApiException(
+                    "Cannot retry message " + failedMessage.getId() + ": no stored request payload "
+                            + "(it predates template support - resend it from the source screen instead).", null);
+        }
+        Map<String, Object> payload;
+        try {
+            payload = objectMapper.readValue(failedMessage.getRequestPayload(), new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            throw new WhatsAppApiException("Cannot retry message " + failedMessage.getId()
+                    + ": stored request payload is not valid JSON: " + e.getMessage(), e);
+        }
         return dispatch(failedMessage, payload);
     }
 }

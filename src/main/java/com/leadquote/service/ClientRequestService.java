@@ -36,8 +36,9 @@ public class ClientRequestService {
         CustomerResponse response = customerResponseRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Client request not found: " + id));
         Lead lead = response.getQuotation().getLead();
+        String quotationNumber = response.getQuotation().getQuotationNumber();
 
-        whatsAppService.sendFollowUpMessage(lead, message);
+        whatsAppService.sendFollowUpMessage(lead, quotationNumber, message);
 
         response.setAdminReply(message);
         response.setRepliedAt(LocalDateTime.now());

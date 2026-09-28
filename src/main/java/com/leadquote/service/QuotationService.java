@@ -201,8 +201,10 @@ public class QuotationService {
 
         Quotation saved = quotationRepository.save(quotation);
 
+        // order_util already includes the admin phone AND the (fixed) company email in one
+        // message - do not also call sendContactDetails(), that would fire the Graph API twice
+        // for the same template.
         whatsAppService.sendAcceptanceConfirmation(saved.getLead());
-        whatsAppService.sendContactDetails(saved.getLead());
 
         auditService.log("Quotation", saved.getId(), "QUOTATION_ACCEPTED",
                 "Customer accepted quotation " + saved.getQuotationNumber());

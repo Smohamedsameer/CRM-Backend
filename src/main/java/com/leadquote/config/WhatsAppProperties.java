@@ -20,11 +20,30 @@ public class WhatsAppProperties {
     private String apiVersion = "v20.0";
     /** Shared secret used to validate incoming webhook verify requests (WHATSAPP_WEBHOOK_VERIFY_TOKEN) */
     private String webhookVerifyToken;
-    /** Name of the approved template used for the first-ever message to a new customer
-     * (WHATSAPP_WELCOME_TEMPLATE_NAME). WhatsApp requires business-initiated messages outside an
-     * open 24h customer session to use an approved template, not free text. */
-    private String welcomeTemplateName = "welcome_enquiry";
-    /** Language code the template was approved under, e.g. en_US or en (WHATSAPP_TEMPLATE_LANGUAGE). */
+
+    // ---------------------------------------------------------------------
+    // Approved Meta "utility" templates. Every business-initiated message
+    // (i.e. anything WE start, not a reply inside an open 24h customer
+    // session) MUST use one of these - Meta rejects free-text "text" type
+    // messages outside that window. Names below must match EXACTLY what
+    // was approved in WhatsApp Manager, including case.
+    // ---------------------------------------------------------------------
+
+    /** Sent the moment a new lead comes in: welcome + link to the enquiry form. (WHATSAPP_CONFIRM_TEMPLATE_NAME) */
+    private String confirmTemplateName = "confirm_util";
+    /** Sent once the customer has filled the enquiry form and the quotation is ready. (WHATSAPP_ENQUIRY_TEMPLATE_NAME) */
+    private String enquiryTemplateName = "enquiry_util";
+    /** Sent once the customer accepts a quotation. (WHATSAPP_ORDER_TEMPLATE_NAME) */
+    private String orderTemplateName = "order_util";
+    /** Sent when an admin replies to a customer's "request changes" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME) */
+    private String customerTemplateName = "customer_util";
+
+    /**
+     * Language code the templates were approved under in WhatsApp Manager (WHATSAPP_TEMPLATE_LANGUAGE).
+     * This must be the exact code Meta shows next to the template, e.g. "en", "en_US" or "en_GB" -
+     * "ENG" is not a valid Graph API code by itself. Sending the wrong code is the #1 reason a
+     * template send fails with error 132001 ("template name does not exist in the translation").
+     */
     private String templateLanguage = "en_US";
 
     public String graphBaseUrl() {
