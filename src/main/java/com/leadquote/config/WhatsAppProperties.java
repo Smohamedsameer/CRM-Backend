@@ -33,6 +33,12 @@ public class WhatsAppProperties {
     private String confirmTemplateName = "confirm_util";
     /** Sent once the customer has filled the enquiry form and the quotation is ready. (WHATSAPP_ENQUIRY_TEMPLATE_NAME) */
     private String enquiryTemplateName = "enquiry_util";
+    /**
+     * Public HTTPS URL of the image used in enquiry_util's IMAGE header (WHATSAPP_ENQUIRY_HEADER_IMAGE_URL).
+     * Must be JPG/PNG, under 5 MB, and reachable without login (e.g. your logo hosted on the frontend
+     * or backend). Ideally the same image you attached when the template was approved.
+     */
+    private String enquiryHeaderImageUrl;
     /** Sent once the customer accepts a quotation. (WHATSAPP_ORDER_TEMPLATE_NAME) */
     private String orderTemplateName = "order_util";
     /** Sent when an admin replies to a customer's "request changes" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME) */

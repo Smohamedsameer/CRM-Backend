@@ -59,20 +59,20 @@ public class WhatsAppService {
 
     // =========================================================================
     // enquiry_util - quotation ready. Body params: customer name, quotation no, amount,
-    // quotation/pdf link. The PDF itself rides as the template's HEADER document parameter
-    // (the template was approved with a document header, per "(pdf file attached)" in the copy).
+    // quotation/pdf link. The template was approved with an IMAGE header, so the header
+    // component carries an image link (whatsapp.enquiry-header-image-url). An image header
+    // cannot carry the PDF - the customer opens/downloads the PDF from the link in the body
+    // ({{4}} = the public quotation page/PDF link).
     // =========================================================================
     public WhatsAppMessage sendQuotation(Lead lead, Quotation quotation, String quotationPageLink) {
-        List<Map<String, Object>> components = new ArrayList<>();
-
-        if (quotation.getPdfPath() != null) {
-            // Same reasoning as before: this MUST be a backend URL, never the frontend host,
-            // or WhatsApp downloads the SPA's index.html instead of the actual PDF.
-            String publicPdfUrl = resolveBackendBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
-            String fileName = quotation.getQuotationNumber().replace("/", "-") + ".pdf";
-            components.add(headerDocumentComponent(publicPdfUrl, fileName));
+        String headerImageUrl = whatsAppProperties.getEnquiryHeaderImageUrl();
+        if (headerImageUrl == null || headerImageUrl.isBlank()) {
+            throw new WhatsAppApiException("enquiry_util has an image header, but WHATSAPP_ENQUIRY_HEADER_IMAGE_URL "
+                    + "is not set. Set it to a public HTTPS image URL (JPG/PNG, max 5 MB).");
         }
 
+        List<Map<String, Object>> components = new ArrayList<>();
+        components.add(headerImageComponent(headerImageUrl));
         components.add(bodyComponent(
                 lead.getCustomerName(),
                 quotation.getQuotationNumber(),
@@ -139,14 +139,13 @@ public class WhatsAppService {
         return body;
     }
 
-    private Map<String, Object> headerDocumentComponent(String link, String filename) {
-        Map<String, Object> document = new HashMap<>();
-        document.put("link", link);
-        document.put("filename", filename);
+    private Map<String, Object> headerImageComponent(String link) {
+        Map<String, Object> image = new HashMap<>();
+        image.put("link", link);
 
         Map<String, Object> param = new HashMap<>();
-        param.put("type", "document");
-        param.put("document", document);
+        param.put("type", "image");
+        param.put("image", image);
 
         Map<String, Object> header = new HashMap<>();
         header.put("type", "header");
@@ -240,14 +239,19 @@ public class WhatsAppService {
             return whatsAppMessageRepository.save(message);
 
         } catch (Exception ex) {
-            log.error("WhatsApp API call failed for lead {}: {}", message.getLead().getLeadCode(), ex.getMessage());
+            String reason = ex.getMessage();
+            if (ex instanceof org.springframework.web.reactive.function.client.WebClientResponseException wre) {
+                // Include Meta's own JSON error (code / message / error_data) - it says exactly what is wrong.
+                reason = ex.getMessage() + " | Meta response: " + wre.getResponseBodyAsString();
+            }
+            log.error("WhatsApp API call failed for lead {}: {}", message.getLead().getLeadCode(), reason);
             message.setDeliveryStatus(MessageDeliveryStatus.FAILED);
-            message.setErrorMessage(ex.getMessage());
+            message.setErrorMessage(reason.length() > 1000 ? reason.substring(0, 1000) : reason);
             message.setRetryCount(message.getRetryCount() + 1);
             whatsAppMessageRepository.save(message);
             // Intentionally do not rethrow further up as a fatal error for the whole workflow;
             // callers decide whether to surface this to the employee for manual retry.
-            throw new WhatsAppApiException("Failed to send WhatsApp message: " + ex.getMessage(), ex);
+            throw new WhatsAppApiException("Failed to send WhatsApp message: " + reason, ex);
         }
     }
 
