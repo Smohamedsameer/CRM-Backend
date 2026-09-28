@@ -46,6 +46,12 @@
       "sourceType": "com.leadquote.config.CompanyProperties"
     },
     {
+      "name": "company.api-base-url",
+      "type": "java.lang.String",
+      "description": "Public HTTPS URL of the deployed BACKEND (Spring Boot), e.g. https:\/\/crm-backend-production-7244.up.railway.app. Used for links that must be served by the backend itself - most importantly the quotation PDF that WhatsApp downloads. If this pointed at the frontend, the SPA rewrite would return index.html and WhatsApp would deliver the file as \"SE-xxxx-2026.pdf.html\".",
+      "sourceType": "com.leadquote.config.CompanyProperties"
+    },
+    {
       "name": "company.email",
       "type": "java.lang.String",
       "sourceType": "com.leadquote.config.CompanyProperties"
@@ -119,6 +125,42 @@
       "sourceType": "com.leadquote.config.WhatsAppProperties"
     },
     {
+      "name": "whatsapp.confirm-template-name",
+      "type": "java.lang.String",
+      "description": "Sent the moment a new lead comes in: welcome + link to the enquiry form. (WHATSAPP_CONFIRM_TEMPLATE_NAME)",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.customer-template-name",
+      "type": "java.lang.String",
+      "description": "Sent when an admin replies to a customer's \"request changes\" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME)",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.enquiry-template-name",
+      "type": "java.lang.String",
+      "description": "Sent once the customer has filled the enquiry form and the quotation is ready. (WHATSAPP_ENQUIRY_TEMPLATE_NAME)",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.header-image-url",
+      "type": "java.lang.String",
+      "description": "Public HTTPS URL of the image used in the IMAGE header of the templates below (WHATSAPP_HEADER_IMAGE_URL). Must be JPG\/PNG, under 5 MB, reachable without login. Falls back to the older WHATSAPP_ENQUIRY_HEADER_IMAGE_URL if only that one is set.",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.image-header-templates",
+      "type": "java.lang.String",
+      "description": "Comma-separated template names that were approved with an image header\/media sample (WHATSAPP_IMAGE_HEADER_TEMPLATES). Remove a name if that template has NO header - sending a header to a template without one fails with a parameter-mismatch error.",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
+      "name": "whatsapp.order-template-name",
+      "type": "java.lang.String",
+      "description": "Sent once the customer accepts a quotation. (WHATSAPP_ORDER_TEMPLATE_NAME)",
+      "sourceType": "com.leadquote.config.WhatsAppProperties"
+    },
+    {
       "name": "whatsapp.phone-number-id",
       "type": "java.lang.String",
       "description": "WHATSAPP_PHONE_NUMBER_ID",
@@ -127,19 +169,13 @@
     {
       "name": "whatsapp.template-language",
       "type": "java.lang.String",
-      "description": "Language code the template was approved under, e.g. en_US or en (WHATSAPP_TEMPLATE_LANGUAGE).",
+      "description": "Language code the templates were approved under in WhatsApp Manager (WHATSAPP_TEMPLATE_LANGUAGE). This must be the exact code Meta shows next to the template, e.g. \"en\", \"en_US\" or \"en_GB\" - \"ENG\" is not a valid Graph API code by itself. Sending the wrong code is the #1 reason a template send fails with error 132001 (\"template name does not exist in the translation\").",
       "sourceType": "com.leadquote.config.WhatsAppProperties"
     },
     {
       "name": "whatsapp.webhook-verify-token",
       "type": "java.lang.String",
       "description": "Shared secret used to validate incoming webhook verify requests (WHATSAPP_WEBHOOK_VERIFY_TOKEN)",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
-    },
-    {
-      "name": "whatsapp.welcome-template-name",
-      "type": "java.lang.String",
-      "description": "Name of the approved template used for the first-ever message to a new customer (WHATSAPP_WELCOME_TEMPLATE_NAME). WhatsApp requires business-initiated messages outside an open 24h customer session to use an approved template, not free text.",
       "sourceType": "com.leadquote.config.WhatsAppProperties"
     }
   ],
