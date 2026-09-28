@@ -60,19 +60,12 @@ public class WhatsAppService {
     // =========================================================================
     // enquiry_util - quotation ready. Body params: customer name, quotation no, amount,
     // quotation/pdf link. The template was approved with an IMAGE header, so the header
-    // component carries an image link (whatsapp.enquiry-header-image-url). An image header
+    // component (added centrally in sendTemplateMessage) carries the image link. An image header
     // cannot carry the PDF - the customer opens/downloads the PDF from the link in the body
     // ({{4}} = the public quotation page/PDF link).
     // =========================================================================
     public WhatsAppMessage sendQuotation(Lead lead, Quotation quotation, String quotationPageLink) {
-        String headerImageUrl = whatsAppProperties.getEnquiryHeaderImageUrl();
-        if (headerImageUrl == null || headerImageUrl.isBlank()) {
-            throw new WhatsAppApiException("enquiry_util has an image header, but WHATSAPP_ENQUIRY_HEADER_IMAGE_URL "
-                    + "is not set. Set it to a public HTTPS image URL (JPG/PNG, max 5 MB).");
-        }
-
         List<Map<String, Object>> components = new ArrayList<>();
-        components.add(headerImageComponent(headerImageUrl));
         components.add(bodyComponent(
                 lead.getCustomerName(),
                 quotation.getQuotationNumber(),
@@ -163,6 +156,23 @@ public class WhatsAppService {
                 .deliveryStatus(MessageDeliveryStatus.QUEUED)
                 .build();
         message = whatsAppMessageRepository.save(message);
+
+        // Templates approved WITH a media sample have an image header, and Meta rejects the send if the
+        // header parameter is missing. Add it here for every template listed in whatsapp.image-header-templates.
+        if (whatsAppProperties.hasImageHeader(templateName)) {
+            String headerImageUrl = whatsAppProperties.getHeaderImageUrl();
+            if (headerImageUrl == null || headerImageUrl.isBlank()) {
+                message.setDeliveryStatus(MessageDeliveryStatus.FAILED);
+                message.setErrorMessage("Template " + templateName + " has an image header but WHATSAPP_HEADER_IMAGE_URL is not set.");
+                whatsAppMessageRepository.save(message);
+                throw new WhatsAppApiException("Template " + templateName + " has an image header, but "
+                        + "WHATSAPP_HEADER_IMAGE_URL is not set. Set it to a public HTTPS JPG/PNG (max 5 MB).");
+            }
+            List<Map<String, Object>> withHeader = new ArrayList<>();
+            withHeader.add(headerImageComponent(headerImageUrl));
+            withHeader.addAll(components);
+            components = withHeader;
+        }
 
         Map<String, Object> template = new HashMap<>();
         template.put("name", templateName);

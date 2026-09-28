@@ -34,11 +34,29 @@ public class WhatsAppProperties {
     /** Sent once the customer has filled the enquiry form and the quotation is ready. (WHATSAPP_ENQUIRY_TEMPLATE_NAME) */
     private String enquiryTemplateName = "enquiry_util";
     /**
-     * Public HTTPS URL of the image used in enquiry_util's IMAGE header (WHATSAPP_ENQUIRY_HEADER_IMAGE_URL).
-     * Must be JPG/PNG, under 5 MB, and reachable without login (e.g. your logo hosted on the frontend
-     * or backend). Ideally the same image you attached when the template was approved.
+     * Public HTTPS URL of the image used in the IMAGE header of the templates below (WHATSAPP_HEADER_IMAGE_URL).
+     * Must be JPG/PNG, under 5 MB, reachable without login. Falls back to the older
+     * WHATSAPP_ENQUIRY_HEADER_IMAGE_URL if only that one is set.
      */
-    private String enquiryHeaderImageUrl;
+    private String headerImageUrl;
+    /** Legacy name, kept so an existing Railway variable keeps working. */
+    public void setEnquiryHeaderImageUrl(String url) {
+        if (headerImageUrl == null || headerImageUrl.isBlank()) headerImageUrl = url;
+    }
+    /**
+     * Comma-separated template names that were approved with an image header/media sample
+     * (WHATSAPP_IMAGE_HEADER_TEMPLATES). Remove a name if that template has NO header - sending a
+     * header to a template without one fails with a parameter-mismatch error.
+     */
+    private String imageHeaderTemplates = "confirm_util,enquiry_util,order_util,customer_util";
+
+    public boolean hasImageHeader(String templateName) {
+        if (imageHeaderTemplates == null || templateName == null) return false;
+        for (String t : imageHeaderTemplates.split(",")) {
+            if (t.trim().equalsIgnoreCase(templateName)) return true;
+        }
+        return false;
+    }
     /** Sent once the customer accepts a quotation. (WHATSAPP_ORDER_TEMPLATE_NAME) */
     private String orderTemplateName = "order_util";
     /** Sent when an admin replies to a customer's "request changes" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME) */
