@@ -26,19 +26,22 @@
       "name": "app.enquiry-token-validity-hours",
       "type": "java.lang.Integer",
       "description": "Hours an enquiry-form link stays valid.",
-      "sourceType": "com.leadquote.config.AppProperties"
+      "sourceType": "com.leadquote.config.AppProperties",
+      "defaultValue": 168
     },
     {
       "name": "app.pdf-storage-dir",
       "type": "java.lang.String",
       "description": "Directory where generated quotation PDFs are stored.",
-      "sourceType": "com.leadquote.config.AppProperties"
+      "sourceType": "com.leadquote.config.AppProperties",
+      "defaultValue": ".\/storage\/quotations"
     },
     {
       "name": "app.quotation-validity-days",
       "type": "java.lang.Integer",
       "description": "Days a quotation acceptance link \/ quotation itself stays valid.",
-      "sourceType": "com.leadquote.config.AppProperties"
+      "sourceType": "com.leadquote.config.AppProperties",
+      "defaultValue": 15
     },
     {
       "name": "company.address",
@@ -116,7 +119,8 @@
       "name": "whatsapp.api-version",
       "type": "java.lang.String",
       "description": "WHATSAPP_API_VERSION, e.g. v20.0",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "v20.0"
     },
     {
       "name": "whatsapp.business-account-id",
@@ -128,19 +132,22 @@
       "name": "whatsapp.confirm-template-name",
       "type": "java.lang.String",
       "description": "Sent the moment a new lead comes in: welcome + link to the enquiry form. (WHATSAPP_CONFIRM_TEMPLATE_NAME)",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "confirm_util"
     },
     {
       "name": "whatsapp.customer-template-name",
       "type": "java.lang.String",
       "description": "Sent when an admin replies to a customer's \"request changes\" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME)",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "customer_util"
     },
     {
       "name": "whatsapp.enquiry-template-name",
       "type": "java.lang.String",
       "description": "Sent once the customer has filled the enquiry form and the quotation is ready. (WHATSAPP_ENQUIRY_TEMPLATE_NAME)",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "enquiry_util"
     },
     {
       "name": "whatsapp.header-image-url",
@@ -152,13 +159,15 @@
       "name": "whatsapp.image-header-templates",
       "type": "java.lang.String",
       "description": "Comma-separated template names that were approved with an image header\/media sample (WHATSAPP_IMAGE_HEADER_TEMPLATES). Remove a name if that template has NO header - sending a header to a template without one fails with a parameter-mismatch error.",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "confirm_util,enquiry_util,order_util,customer_util"
     },
     {
       "name": "whatsapp.order-template-name",
       "type": "java.lang.String",
       "description": "Sent once the customer accepts a quotation. (WHATSAPP_ORDER_TEMPLATE_NAME)",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "order_util"
     },
     {
       "name": "whatsapp.phone-number-id",
@@ -170,7 +179,8 @@
       "name": "whatsapp.template-language",
       "type": "java.lang.String",
       "description": "Language code the templates were approved under in WhatsApp Manager (WHATSAPP_TEMPLATE_LANGUAGE). This must be the exact code Meta shows next to the template, e.g. \"en\", \"en_US\" or \"en_GB\" - \"ENG\" is not a valid Graph API code by itself. Sending the wrong code is the #1 reason a template send fails with error 132001 (\"template name does not exist in the translation\").",
-      "sourceType": "com.leadquote.config.WhatsAppProperties"
+      "sourceType": "com.leadquote.config.WhatsAppProperties",
+      "defaultValue": "en_US"
     },
     {
       "name": "whatsapp.webhook-verify-token",

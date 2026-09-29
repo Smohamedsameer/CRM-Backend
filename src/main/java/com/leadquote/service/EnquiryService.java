@@ -55,6 +55,20 @@ public class EnquiryService {
                 .craneHeightM(request.getCraneHeightM())
                 .scopeOfWork(request.getScopeOfWork())
                 .scopeOfWorkLocation(request.getScopeOfWorkLocation())
+                .widthMeasurementBasis(request.getWidthMeasurementBasis())
+                .lengthMeasurementBasis(request.getLengthMeasurementBasis())
+                .intermediateBaySpacingM(request.getIntermediateBaySpacingM())
+                .endBaySpacingM(request.getEndBaySpacingM())
+                .brickWallHeightM(request.getBrickWallHeightM())
+                .roofSlope(request.getRoofSlope())
+                .roofingCladdingRequirement(request.getRoofingCladdingRequirement())
+                .mainShedRoofMaterial(request.getMainShedRoofMaterial())
+                .mainShedRoofMaterialOther(request.getMainShedRoofMaterialOther())
+                .surfacePreparation(request.getSurfacePreparation())
+                .protectiveCoating(request.getProtectiveCoating())
+                .protectiveCoatingOther(request.getProtectiveCoatingOther())
+                .skylightRequired(request.getSkylightRequired())
+                .roofVentilatorRequired(request.getRoofVentilatorRequired())
                 .build();
 
         Enquiry saved = enquiryRepository.save(enquiry);

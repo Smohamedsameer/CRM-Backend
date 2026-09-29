@@ -52,7 +52,10 @@ public class PdfService {
             addCustomerDetails(document, quotation);
             addItemsTable(document, quotation);
             addTotals(document, quotation);
-            addTermsAndAcceptance(document);
+            addApproxValueNote(document);
+            addTermsAndConditions(document);
+            addSignatureAndSeal(document);
+            addFooter(document);
 
             document.close();
             return file.getPath();
@@ -156,83 +159,8 @@ public class PdfService {
 
         document.add(table);
         document.add(Chunk.NEWLINE);
-
-        if (lead.getEnquiry() != null) {
-            addPebSpecTable(document, lead.getEnquiry());
-        }
     }
 
-    /** Renders the PEB requirement spec (building type, frame, dimensions, cladding, crane, scope) if present. */
-    private void addPebSpecTable(Document document, com.leadquote.entity.Enquiry e) throws DocumentException {
-        java.util.List<String[]> rows = new java.util.ArrayList<>();
-        if (notBlank(e.getBuildingType())) {
-            String type = "OTHER".equals(e.getBuildingType()) ? nullToEmpty(e.getBuildingTypeOther()) : labelize(e.getBuildingType());
-            rows.add(new String[]{"Building Type", type});
-        }
-        if (notBlank(e.getNoOfSheds())) rows.add(new String[]{"No. of Sheds", e.getNoOfSheds()});
-        if (notBlank(e.getEndFrameType())) rows.add(new String[]{"End Frame", labelize(e.getEndFrameType())});
-        if (notBlank(e.getColumnType())) rows.add(new String[]{"Column", labelize(e.getColumnType())});
-        if (e.getSpanWidthM() != null) rows.add(new String[]{"Span / Width", e.getSpanWidthM() + " m"});
-        if (e.getLengthM() != null) rows.add(new String[]{"Length", e.getLengthM() + " m"});
-        if (e.getClearEaveHeightM() != null) rows.add(new String[]{"Clear Eave Height", e.getClearEaveHeightM() + " m"});
-        if (e.getEaveHeightM() != null) rows.add(new String[]{"Eave Height", e.getEaveHeightM() + " m"});
-        if (notBlank(e.getRoofCladdingMaterial())) {
-            rows.add(new String[]{"Roof Cladding", labelize(e.getRoofCladdingMaterial())
-                    + (notBlank(e.getRoofCladdingThickness()) ? ", " + e.getRoofCladdingThickness() : "")
-                    + (notBlank(e.getRoofCladdingColour()) ? ", " + e.getRoofCladdingColour() : "")});
-        }
-        if (notBlank(e.getSideCladdingMaterial())) {
-            rows.add(new String[]{"Side Cladding", labelize(e.getSideCladdingMaterial())
-                    + (notBlank(e.getSideCladdingThickness()) ? ", " + e.getSideCladdingThickness() : "")
-                    + (notBlank(e.getSideCladdingColour()) ? ", " + e.getSideCladdingColour() : "")});
-        }
-        if (Boolean.TRUE.equals(e.getCraneRequired())) {
-            String crane = "Yes";
-            if (notBlank(e.getCraneType())) crane += " — " + e.getCraneType();
-            if (notBlank(e.getCraneCapacityTonnes())) crane += ", " + e.getCraneCapacityTonnes() + " T";
-            if (notBlank(e.getCraneHeightM())) crane += ", " + e.getCraneHeightM() + " m height";
-            rows.add(new String[]{"Crane / Hoist", crane});
-        }
-        if (notBlank(e.getScopeOfWork())) {
-            String scope = labelize(e.getScopeOfWork());
-            if (notBlank(e.getScopeOfWorkLocation())) scope += " (" + e.getScopeOfWorkLocation() + ")";
-            rows.add(new String[]{"Scope of Work", scope});
-        }
-        if (notBlank(e.getRequirement())) rows.add(new String[]{"Requirement", e.getRequirement()});
-        if (notBlank(e.getSpecifications())) rows.add(new String[]{"Specifications", e.getSpecifications()});
-        if (notBlank(e.getAdditionalRequirements())) rows.add(new String[]{"Additional Requirements", e.getAdditionalRequirements()});
-        if (notBlank(e.getRemarks())) rows.add(new String[]{"Remarks", e.getRemarks()});
-
-        if (rows.isEmpty()) return;
-
-        Paragraph title = new Paragraph("Requirement / Building Specification", HEADER_FONT);
-        document.add(title);
-
-        PdfPTable table = new PdfPTable(2);
-        table.setWidthPercentage(100);
-        table.setSpacingBefore(5);
-        for (String[] row : rows) {
-            addPlainRow(table, row[0] + ":", row[1]);
-        }
-        document.add(table);
-        document.add(Chunk.NEWLINE);
-    }
-
-    private boolean notBlank(String s) {
-        return s != null && !s.isBlank();
-    }
-
-    /** BUILDING_TYPE -> "Building Type" */
-    private String labelize(String value) {
-        if (value == null) return "";
-        String[] words = value.toLowerCase().split("_");
-        StringBuilder sb = new StringBuilder();
-        for (String w : words) {
-            if (sb.length() > 0) sb.append(" ");
-            sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
-        }
-        return sb.toString();
-    }
 
     /**
      * Rather than showing GST as its own line item, each product's displayed unit price and
@@ -324,23 +252,110 @@ public class PdfService {
         document.add(Chunk.NEWLINE);
     }
 
-    private void addTermsAndAcceptance(Document document) throws DocumentException {
+    /** Approximate-value disclaimer shown directly below the items/totals table. */
+    private void addApproxValueNote(Document document) throws DocumentException {
+        Paragraph note = new Paragraph(
+                "Note: The above amount is approximate and indicative only. Final pricing may vary based on "
+                        + "actual site conditions, measurements taken at the time of execution, structural design "
+                        + "requirements, statutory approvals, and prevailing material costs.",
+                SMALL_FONT);
+        document.add(note);
+        document.add(Chunk.NEWLINE);
+    }
+
+    /** Construction-industry terms & conditions for the quotation. */
+    private void addTermsAndConditions(Document document) throws DocumentException {
         Paragraph terms = new Paragraph("Terms & Conditions", HEADER_FONT);
         document.add(terms);
         Paragraph termsBody = new Paragraph(
-                "1. This quotation is valid until the date mentioned above.\n" +
-                "2. Prices are subject to change after the validity period.\n" +
-                "3. Delivery timelines will be confirmed upon order confirmation.\n" +
-                "4. Payment terms as mutually agreed at the time of order confirmation.",
+                "1. This quotation is valid until the date mentioned above; rates are subject to revision thereafter.\n" +
+                "2. Scope of work is limited strictly to the items listed above. Civil, foundation, electrical, " +
+                "plumbing and any other works are excluded unless explicitly mentioned.\n" +
+                "3. Rates are based on the site details and specifications provided by the customer. Any variation " +
+                "in site conditions, drawings, statutory requirements, or client-requested changes will be treated " +
+                "as an extra and billed separately.\n" +
+                "4. Delivery and execution timelines are indicative and subject to site readiness, weather " +
+                "conditions, transportation, and statutory approvals.\n" +
+                "5. Payment terms: as mutually agreed at the time of order confirmation (advance, milestone and " +
+                "balance payments as applicable). Work/supply will commence only after receipt of the agreed advance.\n" +
+                "6. Material ordered as per customer-approved specifications is non-returnable and non-refundable " +
+                "once fabricated or dispatched.\n" +
+                "7. Applicable taxes (GST) are as per the prevailing rate at the time of billing.\n" +
+                "8. This document is a quotation only and does not constitute a binding contract until formally " +
+                "accepted by the customer and confirmed by us in writing.\n" +
+                "9. Any dispute arising out of this quotation shall be subject to the jurisdiction of the courts " +
+                "where our registered office is located.",
                 NORMAL_FONT);
         document.add(termsBody);
         document.add(Chunk.NEWLINE);
+    }
 
-        Paragraph acceptance = new Paragraph("Acceptance", HEADER_FONT);
-        document.add(acceptance);
-        document.add(new Paragraph("Customer Signature: ______________________     Date: ____________", NORMAL_FONT));
+    /** Left: authorized signatory / company seal. Right: customer acceptance signature and date. */
+    private void addSignatureAndSeal(Document document) throws DocumentException {
         document.add(Chunk.NEWLINE);
-        document.add(new Paragraph("This is a system-generated quotation.", SMALL_FONT));
+
+        PdfPTable table = new PdfPTable(new float[]{1f, 1f});
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(10);
+
+        PdfPCell leftCell = new PdfPCell();
+        leftCell.setBorder(Rectangle.NO_BORDER);
+        leftCell.setPaddingTop(30);
+        Paragraph forCompany = new Paragraph("For " + nullToEmpty(settingsService.getCompanyName()), HEADER_FONT);
+        leftCell.addElement(forCompany);
+        leftCell.addElement(new Paragraph(" ", NORMAL_FONT));
+        leftCell.addElement(new Paragraph(" ", NORMAL_FONT));
+        leftCell.addElement(new Paragraph("Authorized Signatory", NORMAL_FONT));
+        Paragraph sealLabel = new Paragraph("(Company Seal)", SMALL_FONT);
+        leftCell.addElement(sealLabel);
+        table.addCell(leftCell);
+
+        PdfPCell rightCell = new PdfPCell();
+        rightCell.setBorder(Rectangle.NO_BORDER);
+        rightCell.setPaddingTop(30);
+        Paragraph acceptTitle = new Paragraph("Customer Acceptance", HEADER_FONT);
+        acceptTitle.setAlignment(Element.ALIGN_RIGHT);
+        rightCell.addElement(acceptTitle);
+        Paragraph sig = new Paragraph("Signature: ______________________", NORMAL_FONT);
+        sig.setAlignment(Element.ALIGN_RIGHT);
+        rightCell.addElement(sig);
+        Paragraph dt = new Paragraph("Dated: ____________", NORMAL_FONT);
+        dt.setAlignment(Element.ALIGN_RIGHT);
+        rightCell.addElement(dt);
+        table.addCell(rightCell);
+
+        document.add(table);
+        document.add(Chunk.NEWLINE);
+        Paragraph systemNote = new Paragraph("This is a system-generated quotation.", SMALL_FONT);
+        document.add(systemNote);
+    }
+
+    /** Horizontal rule followed by the company address and contact details, centered. */
+    private void addFooter(Document document) throws DocumentException {
+        document.add(Chunk.NEWLINE);
+        LineSeparator sep = new LineSeparator();
+        document.add(new Chunk(sep));
+        document.add(Chunk.NEWLINE);
+
+        Paragraph addr = new Paragraph(nullToEmpty(settingsService.getCompanyAddress()), SMALL_FONT);
+        addr.setAlignment(Element.ALIGN_CENTER);
+        document.add(addr);
+
+        StringBuilder contactLine = new StringBuilder();
+        if (notBlank(settingsService.getCompanyPhone())) contactLine.append("Phone: ").append(settingsService.getCompanyPhone());
+        if (notBlank(settingsService.getCompanyEmail())) {
+            if (contactLine.length() > 0) contactLine.append("  |  ");
+            contactLine.append("Email: ").append(settingsService.getCompanyEmail());
+        }
+        if (contactLine.length() > 0) {
+            Paragraph contact = new Paragraph(contactLine.toString(), SMALL_FONT);
+            contact.setAlignment(Element.ALIGN_CENTER);
+            document.add(contact);
+        }
+    }
+
+    private boolean notBlank(String s) {
+        return s != null && !s.isBlank();
     }
 
     private void addPlainRow(PdfPTable table, String label, String value) {

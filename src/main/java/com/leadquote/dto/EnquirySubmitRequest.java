@@ -45,4 +45,20 @@ public class EnquirySubmitRequest {
     private String craneHeightM;
     private String scopeOfWork;
     private String scopeOfWorkLocation;
+
+    // ---- Extended building dimensions & finishing requirements ----
+    private String widthMeasurementBasis;
+    private String lengthMeasurementBasis;
+    private Double intermediateBaySpacingM;
+    private Double endBaySpacingM;
+    private Double brickWallHeightM;
+    private String roofSlope;
+    private String roofingCladdingRequirement;
+    private String mainShedRoofMaterial;
+    private String mainShedRoofMaterialOther;
+    private String surfacePreparation;
+    private String protectiveCoating;
+    private String protectiveCoatingOther;
+    private Boolean skylightRequired;
+    private Boolean roofVentilatorRequired;
 }

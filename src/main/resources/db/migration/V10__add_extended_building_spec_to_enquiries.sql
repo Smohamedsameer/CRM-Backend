@@ -1,0 +1,15 @@
+ALTER TABLE enquiries
+    ADD COLUMN width_measurement_basis VARCHAR(255),
+    ADD COLUMN length_measurement_basis VARCHAR(255),
+    ADD COLUMN intermediate_bay_spacing_m DOUBLE,
+    ADD COLUMN end_bay_spacing_m DOUBLE,
+    ADD COLUMN brick_wall_height_m DOUBLE,
+    ADD COLUMN roof_slope VARCHAR(255),
+    ADD COLUMN roofing_cladding_requirement VARCHAR(255),
+    ADD COLUMN main_shed_roof_material VARCHAR(255),
+    ADD COLUMN main_shed_roof_material_other VARCHAR(255),
+    ADD COLUMN surface_preparation VARCHAR(500),
+    ADD COLUMN protective_coating VARCHAR(255),
+    ADD COLUMN protective_coating_other VARCHAR(255),
+    ADD COLUMN skylight_required BIT(1),
+    ADD COLUMN roof_ventilator_required BIT(1);

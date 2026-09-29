@@ -121,6 +121,54 @@ public class Enquiry {
     @Column(name = "scope_of_work_location")
     private String scopeOfWorkLocation;
 
+    // ---- Extended building dimensions & finishing requirements ----
+
+    @Column(name = "width_measurement_basis")
+    private String widthMeasurementBasis;
+
+    @Column(name = "length_measurement_basis")
+    private String lengthMeasurementBasis;
+
+    @Column(name = "intermediate_bay_spacing_m")
+    private Double intermediateBaySpacingM;
+
+    @Column(name = "end_bay_spacing_m")
+    private Double endBaySpacingM;
+
+    @Column(name = "brick_wall_height_m")
+    private Double brickWallHeightM;
+
+    @Column(name = "roof_slope")
+    private String roofSlope;
+
+    /** ROOF_ONLY, ROOF_AND_GABLE_END, ROOF_GABLE_END_AND_WALLS, FULL_ROOF_GABLE_END_AND_CLADDING */
+    @Column(name = "roofing_cladding_requirement")
+    private String roofingCladdingRequirement;
+
+    /** CCGI, CCGL, BAREGALVALUME, OTHER */
+    @Column(name = "main_shed_roof_material")
+    private String mainShedRoofMaterial;
+
+    @Column(name = "main_shed_roof_material_other")
+    private String mainShedRoofMaterialOther;
+
+    /** Comma-separated: MECHANICAL_CLEANING, SAND_BLASTING_ON_STEEL */
+    @Column(name = "surface_preparation", length = 500)
+    private String surfacePreparation;
+
+    /** RED_OXIDE_PRIMER, ZINC_CHROMATE_RED_OXIDE_PRIMER, OTHER */
+    @Column(name = "protective_coating")
+    private String protectiveCoating;
+
+    @Column(name = "protective_coating_other")
+    private String protectiveCoatingOther;
+
+    @Column(name = "skylight_required")
+    private Boolean skylightRequired;
+
+    @Column(name = "roof_ventilator_required")
+    private Boolean roofVentilatorRequired;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
