@@ -169,6 +169,93 @@ public class Enquiry {
     @Column(name = "roof_ventilator_required")
     private Boolean roofVentilatorRequired;
 
+    // ---- Ventilator system detail, gutters/downtake, canopy, louver, road facilities, declaration ----
+
+    @Column(name = "roof_ventilator_diameter_throat")
+    private String roofVentilatorDiameterThroat;
+
+    @Column(name = "roof_ventilator_air_change_per_hr")
+    private String roofVentilatorAirChangePerHr;
+
+    @Column(name = "roof_ventilator_quantity")
+    private String roofVentilatorQuantity;
+
+    @Column(name = "ridge_vent_required")
+    private Boolean ridgeVentRequired;
+
+    @Column(name = "ridge_vent_size")
+    private String ridgeVentSize;
+
+    @Column(name = "ridge_vent_quantity")
+    private String ridgeVentQuantity;
+
+    @Column(name = "crane_size")
+    private String craneSize;
+
+    /** ROOF_STYLE_1..4 (see ROOF_STYLE_OPTIONS on the frontend) */
+    @Column(name = "roof_style")
+    private String roofStyle;
+
+    /** Comma-separated: EAVE_GUTTER, VALLEY_GUTTER */
+    @Column(name = "gutter_types")
+    private String gutterTypes;
+
+    /** PPGI, CCGL, BAREGALVALUME, OTHER */
+    @Column(name = "gutter_material")
+    private String gutterMaterial;
+
+    @Column(name = "gutter_material_other")
+    private String gutterMaterialOther;
+
+    @Column(name = "downtake_pipes_required")
+    private Boolean downtakePipesRequired;
+
+    /** PVC, OTHER */
+    @Column(name = "downtake_pipe_material")
+    private String downtakePipeMaterial;
+
+    @Column(name = "downtake_pipe_material_other")
+    private String downtakePipeMaterialOther;
+
+    @Column(name = "canopy_required")
+    private Boolean canopyRequired;
+
+    @Column(name = "canopy_size_oo")
+    private String canopySizeOo;
+
+    @Column(name = "canopy_height_ffl")
+    private String canopyHeightFfl;
+
+    @Column(name = "sheet_metal_louver_required")
+    private Boolean sheetMetalLouverRequired;
+
+    @Column(name = "sheet_metal_louver_size_oo")
+    private String sheetMetalLouverSizeOo;
+
+    @Column(name = "road_trailer_access")
+    private Boolean roadTrailerAccess;
+
+    @Column(name = "road_goods_stocking_detail", length = 1000)
+    private String roadGoodsStockingDetail;
+
+    @Column(name = "road_shutter_provision_detail", length = 1000)
+    private String roadShutterProvisionDetail;
+
+    @Column(name = "project_period")
+    private String projectPeriod;
+
+    @Column(name = "declarant_name")
+    private String declarantName;
+
+    @Column(name = "declarant_designation")
+    private String declarantDesignation;
+
+    @Column(name = "declarant_address", length = 500)
+    private String declarantAddress;
+
+    @Column(name = "declarant_sign_seal")
+    private String declarantSignSeal;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

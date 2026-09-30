@@ -61,4 +61,33 @@ public class EnquirySubmitRequest {
     private String protectiveCoatingOther;
     private Boolean skylightRequired;
     private Boolean roofVentilatorRequired;
+
+    // ---- Ventilator system detail, gutters/downtake, canopy, louver, road facilities, declaration ----
+    private String roofVentilatorDiameterThroat;
+    private String roofVentilatorAirChangePerHr;
+    private String roofVentilatorQuantity;
+    private Boolean ridgeVentRequired;
+    private String ridgeVentSize;
+    private String ridgeVentQuantity;
+    private String craneSize;
+    private String roofStyle;
+    private String gutterTypes;
+    private String gutterMaterial;
+    private String gutterMaterialOther;
+    private Boolean downtakePipesRequired;
+    private String downtakePipeMaterial;
+    private String downtakePipeMaterialOther;
+    private Boolean canopyRequired;
+    private String canopySizeOo;
+    private String canopyHeightFfl;
+    private Boolean sheetMetalLouverRequired;
+    private String sheetMetalLouverSizeOo;
+    private Boolean roadTrailerAccess;
+    private String roadGoodsStockingDetail;
+    private String roadShutterProvisionDetail;
+    private String projectPeriod;
+    private String declarantName;
+    private String declarantDesignation;
+    private String declarantAddress;
+    private String declarantSignSeal;
 }
