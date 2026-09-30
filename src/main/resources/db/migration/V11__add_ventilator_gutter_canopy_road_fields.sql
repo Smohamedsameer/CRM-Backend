@@ -24,5 +24,5 @@ ALTER TABLE enquiries
     ADD COLUMN project_period VARCHAR(100),
     ADD COLUMN declarant_name VARCHAR(100),
     ADD COLUMN declarant_designation VARCHAR(100),
-    ADD COLUMN declarant_address VARCHAR(300),
+    ADD COLUMN declarant_address VARCHAR(200),
     ADD COLUMN declarant_sign_seal VARCHAR(100);
