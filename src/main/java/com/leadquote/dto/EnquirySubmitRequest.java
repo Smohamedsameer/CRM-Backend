@@ -61,4 +61,7 @@ public class EnquirySubmitRequest {
     private String protectiveCoatingOther;
     private Boolean skylightRequired;
     private Boolean roofVentilatorRequired;
+
+    /** JSON blob: ventilation, gutters, canopy, louver, road facilities, project period, sign-off. */
+    private String extraDetails;
 }

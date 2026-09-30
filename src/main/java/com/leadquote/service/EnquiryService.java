@@ -69,6 +69,7 @@ public class EnquiryService {
                 .protectiveCoatingOther(request.getProtectiveCoatingOther())
                 .skylightRequired(request.getSkylightRequired())
                 .roofVentilatorRequired(request.getRoofVentilatorRequired())
+                .extraDetails(request.getExtraDetails())
                 .build();
 
         Enquiry saved = enquiryRepository.save(enquiry);

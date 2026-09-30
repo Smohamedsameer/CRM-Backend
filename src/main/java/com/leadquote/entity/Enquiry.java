@@ -169,6 +169,10 @@ public class Enquiry {
     @Column(name = "roof_ventilator_required")
     private Boolean roofVentilatorRequired;
 
+    @jakarta.persistence.Lob
+    @Column(name = "extra_details")
+    private String extraDetails;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
