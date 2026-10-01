@@ -20,6 +20,11 @@ public class LeadResponse {
     private BigDecimal estimatedAmount;
     private String phone;
     private String email;
+    private String address;
+    private String pincode;
+    private String gstNumber;
+    private String projectName;
+    private java.time.LocalDate quotationDate;
     private LeadSource source;
     private LeadStatus status;
     private LocalDateTime createdAt;
@@ -34,6 +39,11 @@ public class LeadResponse {
                 .estimatedAmount(lead.getEstimatedAmount())
                 .phone(lead.getPhone())
                 .email(lead.getEmail())
+                .address(lead.getAddress())
+                .pincode(lead.getPincode())
+                .gstNumber(lead.getGstNumber())
+                .projectName(lead.getProjectName())
+                .quotationDate(lead.getQuotationDate())
                 .source(lead.getSource())
                 .status(lead.getStatus())
                 .createdAt(lead.getCreatedAt())

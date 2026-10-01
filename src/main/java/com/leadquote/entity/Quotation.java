@@ -50,6 +50,11 @@ public class Quotation {
 
     private LocalDate validUntil;
 
+    /** Building area (sq ft) and the admin's rate per sq ft used to price this quotation. */
+    private Double areaSqft;
+
+    private BigDecimal ratePerSqft;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private QuotationStatus status = QuotationStatus.DRAFT;

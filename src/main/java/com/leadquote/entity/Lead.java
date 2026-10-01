@@ -43,6 +43,24 @@ public class Lead {
 
     private String email;
 
+    /** Customer address shown in the quotation's "To" block and subject line. */
+    @Column(length = 500)
+    private String address;
+
+    @Column(length = 20)
+    private String pincode;
+
+    @Column(name = "gst_number", length = 30)
+    private String gstNumber;
+
+    /** Shown on the quotation cover page and in the subject line. */
+    @Column(name = "project_name")
+    private String projectName;
+
+    /** Date printed on the quotation (defaults to the generation date when empty). */
+    @Column(name = "quotation_date")
+    private java.time.LocalDate quotationDate;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private LeadSource source;

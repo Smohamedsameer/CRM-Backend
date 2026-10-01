@@ -4,6 +4,8 @@ import com.leadquote.config.AppProperties;
 import com.leadquote.config.CompanyProperties;
 import com.leadquote.dto.LeadCreateRequest;
 import com.leadquote.entity.Lead;
+import com.leadquote.entity.LeadCoverImage;
+import com.leadquote.repository.LeadCoverImageRepository;
 import com.leadquote.entity.LeadStatus;
 import com.leadquote.exception.ExpiredTokenException;
 import com.leadquote.exception.InvalidTokenException;
@@ -25,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class LeadService {
 
     private final LeadRepository leadRepository;
+    private final LeadCoverImageRepository coverImageRepository;
     private final WhatsAppService whatsAppService;
     private final CompanyProperties companyProperties;
     private final AppProperties appProperties;
@@ -33,6 +36,25 @@ public class LeadService {
     private final SecureRandom secureRandom = new SecureRandom();
     // Simple in-memory counter fallback; for multi-instance deployments back this with a DB sequence.
     private final AtomicLong sequence = new AtomicLong(1000);
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** Stores the cover photo sent as a data URL; silently ignores anything that is not a valid image. */
+    private void saveCoverImage(Long leadId, String dataUrl) {
+        if (dataUrl == null || dataUrl.isBlank()) return;
+        try {
+            int comma = dataUrl.indexOf(',');
+            if (!dataUrl.startsWith("data:image/") || comma < 0) return;
+            String contentType = dataUrl.substring(5, dataUrl.indexOf(';') > 0 ? dataUrl.indexOf(';') : comma);
+            byte[] bytes = Base64.getDecoder().decode(dataUrl.substring(comma + 1).trim());
+            if (bytes.length == 0 || bytes.length > 8 * 1024 * 1024) return;
+            coverImageRepository.save(LeadCoverImage.builder().leadId(leadId).contentType(contentType).data(bytes).build());
+        } catch (IllegalArgumentException ex) {
+            // malformed base64 - the lead is still created without a cover image
+        }
+    }
 
     @Transactional
     public Lead createLead(LeadCreateRequest request, String createdByEmail) {
@@ -44,6 +66,11 @@ public class LeadService {
                 .estimatedAmount(request.getEstimatedAmount())
                 .phone(request.getPhone())
                 .email(request.getEmail())
+                .address(blankToNull(request.getAddress()))
+                .pincode(blankToNull(request.getPincode()))
+                .gstNumber(blankToNull(request.getGstNumber()) == null ? null : request.getGstNumber().trim().toUpperCase())
+                .projectName(blankToNull(request.getProjectName()))
+                .quotationDate(request.getQuotationDate())
                 .source(request.getSource())
                 .status(LeadStatus.NEW)
                 .enquiryToken(generateToken())
@@ -51,6 +78,7 @@ public class LeadService {
                 .build();
 
         Lead saved = leadRepository.save(lead);
+        saveCoverImage(saved.getId(), request.getCoverImage());
         auditService.log("Lead", saved.getId(), "LEAD_CREATED", "Lead " + saved.getLeadCode() + " created by " + createdByEmail);
 
         triggerWelcomeWorkflow(saved);

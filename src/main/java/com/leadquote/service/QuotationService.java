@@ -54,19 +54,25 @@ public class QuotationService {
                 .tokenExpiresAt(LocalDateTime.now().plusDays(appProperties.getQuotationValidityDays()))
                 .build();
 
-        List<QuotationItem> items = buildLineItems(lead, request, quotation);
+        boolean pebPricing = request != null && request.getRatePerSqft() != null;
+        if (pebPricing) {
+            Double area = request.getAreaSqft() != null ? request.getAreaSqft() : areaSqftFor(lead);
+            quotation.setAreaSqft(area);
+            quotation.setRatePerSqft(request.getRatePerSqft());
+        }
+        List<QuotationItem> items = pebPricing ? buildPebItem(lead, quotation) : buildLineItems(lead, request, quotation);
         quotation.setItems(items);
 
         BigDecimal subtotal = items.stream()
                 .map(QuotationItem::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal discount = request != null && request.getDiscount() != null
+        BigDecimal discount = pebPricing ? BigDecimal.ZERO : request != null && request.getDiscount() != null
                 ? request.getDiscount()
                 : subtotal.multiply(settingsService.getDefaultDiscountPercentage())
                         .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-        BigDecimal taxPercentage = request != null && request.getTaxPercentage() != null
+        BigDecimal taxPercentage = pebPricing ? BigDecimal.ZERO : request != null && request.getTaxPercentage() != null
                 ? request.getTaxPercentage()
                 : settingsService.getDefaultTaxPercentage();
 
@@ -93,6 +99,30 @@ public class QuotationService {
                 "Quotation " + saved.getQuotationNumber() + " generated for lead " + lead.getLeadCode());
 
         return saved;
+    }
+
+    /** Building area in sq ft = length x width (metres) converted to feet and rounded; falls back to the lead's square feet. */
+    public static Double areaSqftFor(Lead lead) {
+        var e = lead.getEnquiry();
+        if (e != null && e.getSpanWidthM() != null && e.getLengthM() != null) {
+            return (double) Math.round(e.getSpanWidthM() * e.getLengthM() * 10.7639104);
+        }
+        return lead.getSquareFeet() != null ? lead.getSquareFeet() : 0d;
+    }
+
+    /** One line: area x rate per sq ft (GST is stated as excluded in the quotation's terms). */
+    private List<QuotationItem> buildPebItem(Lead lead, Quotation quotation) {
+        double area = quotation.getAreaSqft() != null ? quotation.getAreaSqft() : 0d;
+        BigDecimal rate = quotation.getRatePerSqft();
+        BigDecimal amount = rate.multiply(BigDecimal.valueOf(area)).setScale(2, RoundingMode.HALF_UP);
+        QuotationItem item = QuotationItem.builder()
+                .quotation(quotation)
+                .description("PRE-ENGINEERED STEEL BUILDING")
+                .quantity(area)
+                .unitPrice(rate)
+                .amount(amount)
+                .build();
+        return new ArrayList<>(List.of(item));
     }
 
     private List<QuotationItem> buildLineItems(Lead lead, QuotationGenerateRequest request, Quotation quotation) {
