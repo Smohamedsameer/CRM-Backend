@@ -34,6 +34,14 @@ public class Lead {
 
     private String companyName;
 
+    /** Project name entered on the Add Lead form. Printed on the quotation cover and in its subject line. */
+    @Column(length = 300)
+    private String projectName;
+
+    /** Company / postal address, entered on the Add Lead form. Printed in the quotation's "To" block. */
+    @Column(length = 1000)
+    private String address;
+
     private Double squareFeet;
 
     private BigDecimal estimatedAmount;

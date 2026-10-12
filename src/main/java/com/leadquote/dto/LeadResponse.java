@@ -16,6 +16,8 @@ public class LeadResponse {
     private String leadCode;
     private String customerName;
     private String companyName;
+    private String address;
+    private String projectName;
     private Double squareFeet;
     private BigDecimal estimatedAmount;
     private String phone;
@@ -30,6 +32,8 @@ public class LeadResponse {
                 .leadCode(lead.getLeadCode())
                 .customerName(lead.getCustomerName())
                 .companyName(lead.getCompanyName())
+                .address(lead.getAddress())
+                .projectName(lead.getProjectName())
                 .squareFeet(lead.getSquareFeet())
                 .estimatedAmount(lead.getEstimatedAmount())
                 .phone(lead.getPhone())

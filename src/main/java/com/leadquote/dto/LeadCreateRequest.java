@@ -17,6 +17,10 @@ public class LeadCreateRequest {
 
     private String companyName;
 
+    private String address;
+
+    private String projectName;
+
     private Double squareFeet;
 
     private BigDecimal estimatedAmount;

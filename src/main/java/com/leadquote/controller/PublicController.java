@@ -39,6 +39,7 @@ public class PublicController {
         return Map.of(
                 "customerName", lead.getCustomerName(),
                 "companyName", lead.getCompanyName() == null ? "" : lead.getCompanyName(),
+                "address", lead.getAddress() == null ? "" : lead.getAddress(),
                 "phone", lead.getPhone(),
                 "email", lead.getEmail() == null ? "" : lead.getEmail(),
                 "squareFeet", lead.getSquareFeet() == null ? "" : lead.getSquareFeet()

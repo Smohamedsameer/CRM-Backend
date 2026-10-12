@@ -40,6 +40,8 @@ public class LeadService {
                 .leadCode(generateLeadCode())
                 .customerName(request.getCustomerName())
                 .companyName(request.getCompanyName())
+                .address(request.getAddress())
+                .projectName(request.getProjectName())
                 .squareFeet(request.getSquareFeet())
                 .estimatedAmount(request.getEstimatedAmount())
                 .phone(request.getPhone())

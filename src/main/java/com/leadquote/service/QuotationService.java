@@ -273,6 +273,29 @@ public class QuotationService {
         return new java.io.File(regenerated);
     }
 
+    /** Replaces the stored PDF with the 8-page PEB quotation generated in the browser. */
+    @Transactional
+    public Quotation replacePdf(Long id, byte[] bytes) {
+        Quotation quotation = getById(id);
+        boolean looksLikePdf = bytes != null && bytes.length > 1000
+                && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F';
+        if (!looksLikePdf) {
+            throw new com.leadquote.exception.PdfGenerationException("The uploaded file is not a valid PDF", null);
+        }
+        try {
+            java.io.File dir = new java.io.File(appProperties.getPdfStorageDir());
+            if (!dir.exists()) dir.mkdirs();
+            java.io.File file = new java.io.File(dir, quotation.getQuotationNumber().replace("/", "-") + ".pdf");
+            java.nio.file.Files.write(file.toPath(), bytes);
+            quotation.setPdfPath(file.getPath());
+            auditService.log("Quotation", quotation.getId(), "QUOTATION_PDF_REPLACED",
+                    "PEB quotation PDF saved for " + quotation.getQuotationNumber());
+            return quotationRepository.save(quotation);
+        } catch (java.io.IOException ex) {
+            throw new com.leadquote.exception.PdfGenerationException("Could not save the quotation PDF", ex);
+        }
+    }
+
     public Quotation getById(Long id) {
         return quotationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Quotation not found: " + id));

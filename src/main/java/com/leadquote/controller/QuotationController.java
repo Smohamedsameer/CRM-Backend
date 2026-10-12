@@ -36,6 +36,12 @@ public class QuotationController {
         return quotationService.sendQuotation(quotation);
     }
 
+    /** Stores the 8-page PEB quotation PDF built in the browser, replacing the basic server-made PDF. */
+    @PostMapping(value = "/{id}/pdf", consumes = MediaType.APPLICATION_PDF_VALUE)
+    public Quotation uploadPdf(@PathVariable Long id, @RequestBody byte[] pdf) {
+        return quotationService.replacePdf(id, pdf);
+    }
+
     /** Lets a logged-in employee review any quotation's PDF, regardless of status - the public
      * PDF link (/api/public/quotations/{token}/pdf) only works for the customer's own token. */
     @GetMapping("/{id}/pdf")
