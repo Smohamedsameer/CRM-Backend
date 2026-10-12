@@ -78,6 +78,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                     .requestMatchers("/api/public/**").permitAll()
                     .requestMatchers("/api/webhooks/whatsapp").permitAll()
+                    // Google Sheet -> CRM intake. Protected by the X-Intake-Key header, checked in SheetIntakeController.
+                    .requestMatchers(HttpMethod.POST, "/api/intake/sheet-lead").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     // Everything else requires an authenticated employee JWT
                     .anyRequest().authenticated()

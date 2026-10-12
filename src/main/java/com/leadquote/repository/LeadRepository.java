@@ -20,6 +20,9 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     boolean existsByLeadCode(String leadCode);
 
+    /** Used by the Google Sheet intake to avoid sending a second welcome message to the same person. */
+    Optional<Lead> findFirstByPhoneInAndCreatedAtAfterOrderByCreatedAtDesc(List<String> phones, LocalDateTime after);
+
     @Query("select l from Lead l where " +
             "(:status is null or l.status = :status) and " +
             "(:search is null or lower(l.customerName) like %:search% " +
