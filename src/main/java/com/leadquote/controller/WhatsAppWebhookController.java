@@ -4,6 +4,7 @@ import com.leadquote.config.WhatsAppProperties;
 import com.leadquote.entity.MessageDeliveryStatus;
 import com.leadquote.entity.WhatsAppMessage;
 import com.leadquote.repository.WhatsAppMessageRepository;
+import com.leadquote.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ public class WhatsAppWebhookController {
 
     private final WhatsAppProperties whatsAppProperties;
     private final WhatsAppMessageRepository whatsAppMessageRepository;
+    private final ChatService chatService;
 
     @GetMapping
     public ResponseEntity<String> verify(@RequestParam("hub.mode") String mode,
@@ -56,8 +58,17 @@ public class WhatsAppWebhookController {
                         statuses.forEach(this::applyStatusUpdate);
                     }
 
-                    // Inbound customer messages (value.get("messages")) can be handled here too,
-                    // e.g. to route free-text replies to an employee or a simple auto-responder.
+                    // Inbound customer messages: stored so they show up in the Chat screen.
+                    List<Map<String, Object>> inbound = (List<Map<String, Object>>) value.get("messages");
+                    if (inbound != null) {
+                        for (Map<String, Object> inboundMessage : inbound) {
+                            try {
+                                chatService.recordInbound(inboundMessage);
+                            } catch (Exception ex) {
+                                log.error("Failed to store inbound WhatsApp message: {}", ex.getMessage());
+                            }
+                        }
+                    }
                 }
             }
         } catch (Exception ex) {

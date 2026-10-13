@@ -188,6 +188,39 @@ public class WhatsAppService {
         return dispatch(message, payload);
     }
 
+    // =========================================================================
+    // Chat reply - free text typed by an employee in the Chat screen.
+    // WhatsApp only accepts a plain "text" message inside the 24h customer-service window
+    // (the customer must have messaged us in the last 24h). ChatService checks that first;
+    // if Meta still rejects it, the message is kept as FAILED so it shows in the chat with a Retry.
+    // =========================================================================
+    public WhatsAppMessage sendText(Lead lead, String toPhone, String text, String sentBy) {
+        String to = (toPhone != null && !toPhone.isBlank()) ? toPhone : lead.getPhone();
+        WhatsAppMessage message = WhatsAppMessage.builder()
+                .lead(lead)
+                // FOLLOW_UP is reused on purpose: adding a new enum value would need a database
+                // check-constraint migration. Chat replies are told apart by direction + body.
+                .type(WhatsAppMessageType.FOLLOW_UP)
+                .direction(MessageDirection.OUTBOUND)
+                .toPhone(to)
+                .contactPhone(to)
+                .body(text)
+                .sentBy(sentBy)
+                .agentSeen(true)
+                .payloadSummary(text.length() > 500 ? text.substring(0, 500) : text)
+                .deliveryStatus(MessageDeliveryStatus.QUEUED)
+                .build();
+        message = whatsAppMessageRepository.save(message);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("recipient_type", "individual");
+        payload.put("to", normalizePhone(to));
+        payload.put("type", "text");
+        payload.put("text", Map.of("preview_url", true, "body", text));
+        return dispatch(message, payload);
+    }
+
     /**
      * Public base URL of this backend, in order of preference:
      * 1. company.api-base-url (env COMPANY_API_BASE_URL)

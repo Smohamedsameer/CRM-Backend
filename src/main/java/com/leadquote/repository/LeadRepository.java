@@ -23,6 +23,10 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     /** Used by the Google Sheet intake to avoid sending a second welcome message to the same person. */
     Optional<Lead> findFirstByPhoneInAndCreatedAtAfterOrderByCreatedAtDesc(List<String> phones, LocalDateTime after);
 
+    /** Finds leads by the last digits of their phone number, ignoring +, spaces and dashes. Newest lead first. */
+    @Query("select l from Lead l where replace(replace(replace(l.phone, '+', ''), ' ', ''), '-', '') like concat('%', :tail) order by l.createdAt desc")
+    List<Lead> findByPhoneTail(@Param("tail") String tail);
+
     @Query("select l from Lead l where " +
             "(:status is null or l.status = :status) and " +
             "(:search is null or lower(l.customerName) like %:search% " +

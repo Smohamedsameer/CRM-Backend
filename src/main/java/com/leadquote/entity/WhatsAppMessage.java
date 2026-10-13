@@ -49,6 +49,25 @@ public class WhatsAppMessage {
 
     private int retryCount;
 
+    // ---- Chat module (all nullable, so existing rows and ddl-auto=update keep working) ----
+
+    /** OUTBOUND (us -> customer) or INBOUND (customer -> us). Null on old rows = OUTBOUND. */
+    @Enumerated(EnumType.STRING)
+    private MessageDirection direction;
+
+    /** Free text: an employee's chat reply, or the text of a customer's inbound message. */
+    @Column(columnDefinition = "TEXT")
+    private String body;
+
+    /** The customer's WhatsApp number exactly as Meta reports it (digits incl. country code). Replies go here. */
+    private String contactPhone;
+
+    /** Employee who typed a chat reply. */
+    private String sentBy;
+
+    /** Inbound messages only: false until an employee opens the chat. Null (old rows / outbound) counts as seen. */
+    private Boolean agentSeen;
+
     private LocalDateTime sentAt;
     private LocalDateTime deliveredAt;
     private LocalDateTime readAt;
