@@ -14,6 +14,12 @@ import java.util.Optional;
 public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage, Long> {
     Optional<WhatsAppMessage> findByProviderMessageId(String providerMessageId);
 
+    /** Reminder bookkeeping: messages of one type for a lead, optionally excluding FAILED ones. */
+    long countByLeadIdAndType(Long leadId, com.leadquote.entity.WhatsAppMessageType type);
+
+    long countByLeadIdAndTypeAndDeliveryStatusNot(Long leadId, com.leadquote.entity.WhatsAppMessageType type,
+                                                  com.leadquote.entity.MessageDeliveryStatus status);
+
     @Modifying
     void deleteByLeadId(Long leadId);
 

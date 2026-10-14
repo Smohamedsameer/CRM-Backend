@@ -22,8 +22,8 @@ import java.util.Map;
  * Credentials always come from environment-backed configuration (see WhatsAppProperties),
  * never hard-coded, never sent to the frontend.
  *
- * Every business-initiated message uses one of the four Meta-APPROVED "utility" templates
- * (confirm_util, enquiry_util, order_util, customer_util - see WhatsAppProperties). WhatsApp
+ * Every business-initiated message uses a Meta-APPROVED "utility" template
+ * (confirm_util, remind_util, pdf_util / enquiry_util, order_util, customer_util - see WhatsAppProperties). WhatsApp
  * requires an approved template for any message sent outside an open 24h customer service
  * window, and simply rejects a free-text "text" type message in that case - so this service
  * always sends "type": "template", never "type": "text", for these four flows.
@@ -58,14 +58,27 @@ public class WhatsAppService {
     }
 
     // =========================================================================
-    // enquiry_util - quotation ready. Body params: customer name, quotation no, amount,
-    // quotation/pdf link. The template was approved with an IMAGE header, so the header
-    // component (added centrally in sendTemplateMessage) carries the image link. An image header
-    // cannot carry the PDF - the customer opens/downloads the PDF from the link in the body
-    // ({{4}} = the public quotation page/PDF link).
+    // Quotation ready. Two approved templates are supported:
+    //  - pdf_util     : HEADER = the quotation PDF (document). The customer sees a PDF card at the top of
+    //                   the message; tapping it opens the PDF in WhatsApp, where it can be saved/downloaded.
+    //  - enquiry_util : old template, IMAGE header, PDF only reachable through the link in the body.
+    // pdf_util is used whenever whatsapp.pdf-template-name is set. Both take the same 4 body params:
+    // customer name, quotation no, amount, quotation page link.
     // =========================================================================
     public WhatsAppMessage sendQuotation(Lead lead, Quotation quotation, String quotationPageLink) {
         List<Map<String, Object>> components = new ArrayList<>();
+        String templateName;
+        String pdfTemplate = whatsAppProperties.getPdfTemplateName();
+
+        if (pdfTemplate != null && !pdfTemplate.isBlank()) {
+            templateName = pdfTemplate.trim();
+            String pdfUrl = resolveBackendBaseUrl() + "/api/public/quotations/" + quotation.getSecureToken() + "/pdf";
+            String fileName = quotation.getQuotationNumber().replace("/", "-") + ".pdf";
+            components.add(headerDocumentComponent(pdfUrl, fileName));
+        } else {
+            templateName = whatsAppProperties.getEnquiryTemplateName();
+        }
+
         components.add(bodyComponent(
                 lead.getCustomerName(),
                 quotation.getQuotationNumber(),
@@ -73,10 +86,24 @@ public class WhatsAppService {
                 quotationPageLink
         ));
 
-        String summary = "enquiry_util -> quotation " + quotation.getQuotationNumber()
+        String summary = templateName + " -> quotation " + quotation.getQuotationNumber()
                 + ", total " + quotation.getTotalAmount();
-        return sendTemplateMessage(lead, WhatsAppMessageType.QUOTATION,
-                whatsAppProperties.getEnquiryTemplateName(), components, summary);
+        return sendTemplateMessage(lead, WhatsAppMessageType.QUOTATION, templateName, components, summary);
+    }
+
+    // =========================================================================
+    // remind_util - reminder sent the next day if the customer has not filled the enquiry form.
+    // Body params: customer name, enquiry form link. Stored with type ENQUIRY_FORM (an existing enum
+    // value, so no database change is needed).
+    // =========================================================================
+    public WhatsAppMessage sendEnquiryReminder(Lead lead, String enquiryFormLink) {
+        List<Map<String, Object>> components = List.of(
+                bodyComponent(lead.getCustomerName(), enquiryFormLink)
+        );
+        String summary = whatsAppProperties.getReminderTemplateName() + " -> "
+                + lead.getCustomerName() + ", " + enquiryFormLink;
+        return sendTemplateMessage(lead, WhatsAppMessageType.ENQUIRY_FORM,
+                whatsAppProperties.getReminderTemplateName(), components, summary);
     }
 
     // =========================================================================
@@ -130,6 +157,22 @@ public class WhatsAppService {
         body.put("type", "body");
         body.put("parameters", parameters);
         return body;
+    }
+
+    /** HEADER component for a template approved with a DOCUMENT (PDF) header. */
+    private Map<String, Object> headerDocumentComponent(String link, String fileName) {
+        Map<String, Object> document = new HashMap<>();
+        document.put("link", link);
+        document.put("filename", fileName);
+
+        Map<String, Object> param = new HashMap<>();
+        param.put("type", "document");
+        param.put("document", document);
+
+        Map<String, Object> header = new HashMap<>();
+        header.put("type", "header");
+        header.put("parameters", List.of(param));
+        return header;
     }
 
     private Map<String, Object> headerImageComponent(String link) {

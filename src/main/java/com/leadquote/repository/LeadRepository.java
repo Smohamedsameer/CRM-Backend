@@ -20,6 +20,10 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     boolean existsByLeadCode(String leadCode);
 
+    /** Leads in the given statuses created inside [from, to] - used by the enquiry-form reminder job. */
+    List<Lead> findByStatusInAndCreatedAtBetween(java.util.Collection<LeadStatus> statuses,
+                                                 LocalDateTime from, LocalDateTime to);
+
     /** Used by the Google Sheet intake to avoid sending a second welcome message to the same person. */
     Optional<Lead> findFirstByPhoneInAndCreatedAtAfterOrderByCreatedAtDesc(List<String> phones, LocalDateTime after);
 

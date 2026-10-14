@@ -48,7 +48,7 @@ public class WhatsAppProperties {
      * (WHATSAPP_IMAGE_HEADER_TEMPLATES). Remove a name if that template has NO header - sending a
      * header to a template without one fails with a parameter-mismatch error.
      */
-    private String imageHeaderTemplates = "confirm_util,enquiry_util,order_util,customer_util";
+    private String imageHeaderTemplates = "confirm_util,order_util,customer_util";
 
     public boolean hasImageHeader(String templateName) {
         if (imageHeaderTemplates == null || templateName == null) return false;
@@ -57,6 +57,18 @@ public class WhatsAppProperties {
         }
         return false;
     }
+    /**
+     * Quotation-ready template whose HEADER is a PDF document (WHATSAPP_PDF_TEMPLATE_NAME). The customer sees
+     * the quotation PDF as a tappable card at the top of the message. Leave blank to keep using enquiry_util
+     * (image header + link in the body).
+     */
+    private String pdfTemplateName = "pdf_util";
+    /** Reminder sent if the customer has not filled the enquiry form the next day (WHATSAPP_REMINDER_TEMPLATE_NAME). */
+    private String reminderTemplateName = "remind_util";
+    /** Send the reminder this many hours after the lead was created (WHATSAPP_REMINDER_DELAY_HOURS). */
+    private int reminderDelayHours = 24;
+    /** Do not remind leads older than this many hours - stops a first deploy from messaging old leads (WHATSAPP_REMINDER_MAX_AGE_HOURS). */
+    private int reminderMaxAgeHours = 72;
     /** Sent once the customer accepts a quotation. (WHATSAPP_ORDER_TEMPLATE_NAME) */
     private String orderTemplateName = "order_util";
     /** Sent when an admin replies to a customer's "request changes" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME) */

@@ -267,6 +267,8 @@ public class ChatService {
                 int comma = detail.lastIndexOf(", ");
                 return "Welcome message with your enquiry form link" + (comma >= 0 ? ":\n" + detail.substring(comma + 2) : ".");
             }
+            case ENQUIRY_FORM:
+                return "Reminder: please complete your enquiry form.";
             case QUOTATION:
                 return "Quotation sent: " + detail;
             case ACCEPTANCE_CONFIRMATION:
