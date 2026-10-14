@@ -41,7 +41,7 @@ public class WhatsAppWebhookController {
     @SuppressWarnings("unchecked")
     @PostMapping
     public ResponseEntity<Void> receive(@RequestBody Map<String, Object> payload) {
-        log.in("whatsapp webhook hit: {}" , payload);
+        log.info("whatsapp webhook hit: {}" , payload);
         try {
             List<Map<String, Object>> entries = (List<Map<String, Object>>) payload.get("entry");
             if (entries == null) return ResponseEntity.ok().build();
