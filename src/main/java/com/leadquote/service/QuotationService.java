@@ -10,9 +10,11 @@ import com.leadquote.exception.ExpiredTokenException;
 import com.leadquote.exception.InvalidTokenException;
 import com.leadquote.exception.NotFoundException;
 import com.leadquote.repository.CustomerResponseRepository;
+import com.leadquote.repository.QuotationPdfFileRepository;
 import com.leadquote.repository.QuotationRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,11 +29,16 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class QuotationService {
 
+    /** Largest PDF accepted when an employee uploads an edited quotation. */
+    private static final int MAX_PDF_BYTES = 25 * 1024 * 1024;
+
     private final QuotationRepository quotationRepository;
+    private final QuotationPdfFileRepository quotationPdfFileRepository;
     private final CustomerResponseRepository customerResponseRepository;
     private final SettingsService settingsService;
     private final PdfService pdfService;
@@ -141,6 +148,14 @@ public class QuotationService {
 
     @Transactional
     public Quotation sendQuotation(Quotation quotation) {
+        if (quotation.getStatus() == QuotationStatus.ACCEPTED) {
+            throw new IllegalArgumentException("The customer has already accepted this quotation, so it can't be sent again.");
+        }
+        // Re-sending after the link expired (e.g. a revised quotation): give the customer a fresh validity period.
+        if (quotation.getTokenExpiresAt() != null && quotation.getTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            quotation.setTokenExpiresAt(LocalDateTime.now().plusDays(appProperties.getQuotationValidityDays()));
+            quotation.setValidUntil(LocalDate.now().plusDays(appProperties.getQuotationValidityDays()));
+        }
         String quotationPageLink = companyProperties.getPublicBaseUrl() + "/quotation/" + quotation.getSecureToken();
         // Make sure the PDF really exists on disk before WhatsApp tries to download it.
         ensurePdfFile(quotation);
@@ -269,13 +284,33 @@ public class QuotationService {
             java.io.File f = new java.io.File(path);
             if (f.exists() && f.length() > 0) return f;
         }
+        // The disk was wiped (redeploy): bring back the exact PDF that was uploaded, if we kept a copy.
+        java.io.File restored = restoreFromDatabase(quotation);
+        if (restored != null) return restored;
         String regenerated = pdfService.generateQuotationPdf(quotation);
         quotation.setPdfPath(regenerated);
         quotationRepository.save(quotation);
         return new java.io.File(regenerated);
     }
 
-    /** Replaces the stored PDF with the 8-page PEB quotation generated in the browser. */
+    private java.io.File restoreFromDatabase(Quotation quotation) {
+        java.util.Optional<QuotationPdfFile> copy = quotationPdfFileRepository.findByQuotationId(quotation.getId());
+        if (copy.isEmpty()) return null;
+        try {
+            java.io.File dir = new java.io.File(appProperties.getPdfStorageDir());
+            if (!dir.exists()) dir.mkdirs();
+            java.io.File file = new java.io.File(dir, quotation.getQuotationNumber().replace("/", "-") + ".pdf");
+            java.nio.file.Files.write(file.toPath(), copy.get().getData());
+            quotation.setPdfPath(file.getPath());
+            quotationRepository.save(quotation);
+            return file;
+        } catch (java.io.IOException ex) {
+            log.warn("Could not restore the stored PDF of {}: {}", quotation.getQuotationNumber(), ex.getMessage());
+            return null;
+        }
+    }
+
+    /** Replaces the stored PDF: the 8-page PEB quotation generated in the browser, or the PDF an employee edited in Word and uploaded. */
     @Transactional
     public Quotation replacePdf(Long id, byte[] bytes) {
         Quotation quotation = getById(id);
@@ -284,12 +319,18 @@ public class QuotationService {
         if (!looksLikePdf) {
             throw new com.leadquote.exception.PdfGenerationException("The uploaded file is not a valid PDF", null);
         }
+        if (bytes.length > MAX_PDF_BYTES) {
+            throw new IllegalArgumentException("The PDF is too large (maximum 25 MB).");
+        }
         try {
             java.io.File dir = new java.io.File(appProperties.getPdfStorageDir());
             if (!dir.exists()) dir.mkdirs();
             java.io.File file = new java.io.File(dir, quotation.getQuotationNumber().replace("/", "-") + ".pdf");
             java.nio.file.Files.write(file.toPath(), bytes);
             quotation.setPdfPath(file.getPath());
+            // Keep a copy in the database too, so a redeploy cannot bring back the old auto-generated PDF.
+            quotationPdfFileRepository.deleteByQuotationId(quotation.getId());
+            quotationPdfFileRepository.save(QuotationPdfFile.builder().quotationId(quotation.getId()).data(bytes).build());
             auditService.log("Quotation", quotation.getId(), "QUOTATION_PDF_REPLACED",
                     "PEB quotation PDF saved for " + quotation.getQuotationNumber());
             return quotationRepository.save(quotation);
@@ -306,8 +347,19 @@ public class QuotationService {
     /** Format: SE-1001-2026 (company prefix - running sequence starting at 1001 - year issued). */
     private synchronized String nextQuotationNumber() {
         String prefix = "SE-";
-        long sequence = 1000 + quotationRepository.countByQuotationNumberStartingWith(prefix) + 1;
-        return prefix + sequence + "-" + Year.now().getValue();
+        // Highest number in use + 1. (Counting rows would hand out a duplicate number once a lead has been deleted.)
+        long highest = 1000;
+        for (String number : quotationRepository.findAllNumbersStartingWith(prefix)) {
+            String[] parts = number.split("-"); // SE-1001-2026
+            if (parts.length >= 2) {
+                try {
+                    highest = Math.max(highest, Long.parseLong(parts[1]));
+                } catch (NumberFormatException ignored) {
+                    // not one of our numbers
+                }
+            }
+        }
+        return prefix + (highest + 1) + "-" + Year.now().getValue();
     }
 
     private String generateSecureToken() {

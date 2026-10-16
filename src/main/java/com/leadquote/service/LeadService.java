@@ -5,19 +5,29 @@ import com.leadquote.config.CompanyProperties;
 import com.leadquote.dto.LeadCreateRequest;
 import com.leadquote.entity.Lead;
 import com.leadquote.entity.LeadStatus;
+import com.leadquote.entity.Order;
+import com.leadquote.entity.Quotation;
 import com.leadquote.exception.ExpiredTokenException;
 import com.leadquote.exception.InvalidTokenException;
 import com.leadquote.exception.NotFoundException;
 import com.leadquote.repository.LeadRepository;
+import com.leadquote.repository.NotificationRepository;
+import com.leadquote.repository.OrderRepository;
+import com.leadquote.repository.QuotationPdfFileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.io.File;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -29,6 +39,9 @@ public class LeadService {
     private final CompanyProperties companyProperties;
     private final AppProperties appProperties;
     private final AuditService auditService;
+    private final OrderRepository orderRepository;
+    private final NotificationRepository notificationRepository;
+    private final QuotationPdfFileRepository quotationPdfFileRepository;
 
     private final SecureRandom secureRandom = new SecureRandom();
     // Simple in-memory counter fallback; for multi-instance deployments back this with a DB sequence.
@@ -104,6 +117,55 @@ public class LeadService {
         lead.setStatus(status);
         auditService.log("Lead", lead.getId(), "STATUS_UPDATED", "Status changed to " + status);
         return leadRepository.save(lead);
+    }
+
+    /**
+     * Permanently deletes a lead and everything that belongs to it: the enquiry, quotations (with their items
+     * and customer responses), the order, the WhatsApp / chat history, the bell notifications and the stored PDFs.
+     * The audit log keeps a "LEAD_DELETED" entry.
+     */
+    @Transactional
+    public void deleteLead(Long id, String deletedByEmail) {
+        Lead lead = getById(id);
+        String code = lead.getLeadCode();
+        String name = lead.getCustomerName();
+
+        List<String> pdfPaths = new ArrayList<>();
+        for (Quotation quotation : lead.getQuotations()) {
+            if (quotation.getPdfPath() != null) pdfPaths.add(quotation.getPdfPath());
+            quotationPdfFileRepository.deleteByQuotationId(quotation.getId());
+        }
+
+        // An order points at a quotation, so it has to go before the quotations do.
+        Order order = lead.getOrder();
+        if (order != null) {
+            lead.setOrder(null);
+            orderRepository.delete(order);
+            orderRepository.flush();
+        }
+
+        notificationRepository.deleteByReference("Lead", id);
+
+        // Cascades to enquiry, quotations (+ items, customer responses) and WhatsApp messages.
+        leadRepository.delete(lead);
+
+        auditService.log("Lead", id, "LEAD_DELETED", "Lead " + code + " (" + name + ") deleted by " + deletedByEmail);
+
+        // Remove the PDF files from disk only once the database delete has really been committed.
+        if (!pdfPaths.isEmpty()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    for (String path : pdfPaths) {
+                        try {
+                            new File(path).delete();
+                        } catch (RuntimeException ignored) {
+                            // a leftover file is harmless
+                        }
+                    }
+                }
+            });
+        }
     }
 
     private String generateLeadCode() {

@@ -46,6 +46,12 @@ public class LeadController {
         return LeadResponse.from(leadService.updateStatus(id, status));
     }
 
+    /** Permanently deletes a lead and everything that belongs to it (enquiry, quotations, order, WhatsApp history). */
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id, Authentication auth) {
+        leadService.deleteLead(id, auth.getName());
+    }
+
     /** Employee-triggered retry if the automatic WhatsApp welcome message failed. */
     @PostMapping("/{id}/resend-welcome")
     public LeadResponse resendWelcome(@PathVariable Long id) {
