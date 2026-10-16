@@ -10,6 +10,7 @@ import com.leadquote.exception.ExpiredTokenException;
 import com.leadquote.exception.InvalidTokenException;
 import com.leadquote.exception.NotFoundException;
 import com.leadquote.repository.CustomerResponseRepository;
+import com.leadquote.repository.QuotationFormDataRepository;
 import com.leadquote.repository.QuotationPdfFileRepository;
 import com.leadquote.repository.QuotationRepository;
 
@@ -39,6 +40,7 @@ public class QuotationService {
 
     private final QuotationRepository quotationRepository;
     private final QuotationPdfFileRepository quotationPdfFileRepository;
+    private final QuotationFormDataRepository quotationFormDataRepository;
     private final CustomerResponseRepository customerResponseRepository;
     private final SettingsService settingsService;
     private final PdfService pdfService;
@@ -291,6 +293,26 @@ public class QuotationService {
         quotation.setPdfPath(regenerated);
         quotationRepository.save(quotation);
         return new java.io.File(regenerated);
+    }
+
+    /** Saves the quotation-builder details (JSON) so the Word version can be built later. */
+    @Transactional
+    public void saveFormData(Long id, String json) {
+        Quotation quotation = getById(id);
+        if (json == null || json.isBlank()) {
+            throw new IllegalArgumentException("No quotation details were sent.");
+        }
+        if (json.length() > 30_000_000) {
+            throw new IllegalArgumentException("The quotation details are too large (maximum about 30 MB, usually because of big pictures).");
+        }
+        quotationFormDataRepository.deleteByQuotationId(quotation.getId());
+        quotationFormDataRepository.save(QuotationFormData.builder().quotationId(quotation.getId()).json(json).build());
+    }
+
+    /** The saved quotation-builder details, or null if none were saved (quotation made before this feature). */
+    @Transactional(readOnly = true)
+    public String getFormData(Long id) {
+        return quotationFormDataRepository.findByQuotationId(id).map(QuotationFormData::getJson).orElse(null);
     }
 
     private java.io.File restoreFromDatabase(Quotation quotation) {

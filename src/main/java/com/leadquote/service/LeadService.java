@@ -13,6 +13,7 @@ import com.leadquote.exception.NotFoundException;
 import com.leadquote.repository.LeadRepository;
 import com.leadquote.repository.NotificationRepository;
 import com.leadquote.repository.OrderRepository;
+import com.leadquote.repository.QuotationFormDataRepository;
 import com.leadquote.repository.QuotationPdfFileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,7 @@ public class LeadService {
     private final OrderRepository orderRepository;
     private final NotificationRepository notificationRepository;
     private final QuotationPdfFileRepository quotationPdfFileRepository;
+    private final QuotationFormDataRepository quotationFormDataRepository;
 
     private final SecureRandom secureRandom = new SecureRandom();
     // Simple in-memory counter fallback; for multi-instance deployments back this with a DB sequence.
@@ -134,6 +136,7 @@ public class LeadService {
         for (Quotation quotation : lead.getQuotations()) {
             if (quotation.getPdfPath() != null) pdfPaths.add(quotation.getPdfPath());
             quotationPdfFileRepository.deleteByQuotationId(quotation.getId());
+            quotationFormDataRepository.deleteByQuotationId(quotation.getId());
         }
 
         // An order points at a quotation, so it has to go before the quotations do.

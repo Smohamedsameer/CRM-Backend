@@ -42,6 +42,19 @@ public class QuotationController {
         return quotationService.replacePdf(id, pdf);
     }
 
+    /** Saves the quotation-builder details (JSON) so the Word version can be downloaded later from the list. */
+    @PutMapping(value = "/{id}/form-data", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public void saveFormData(@PathVariable Long id, @RequestBody String json) {
+        quotationService.saveFormData(id, json);
+    }
+
+    @GetMapping(value = "/{id}/form-data", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> getFormData(@PathVariable Long id) {
+        String json = quotationService.getFormData(id);
+        if (json == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store").body(json);
+    }
+
     /** Lets a logged-in employee review any quotation's PDF, regardless of status - the public
      * PDF link (/api/public/quotations/{token}/pdf) only works for the customer's own token. */
     @GetMapping("/{id}/pdf")
