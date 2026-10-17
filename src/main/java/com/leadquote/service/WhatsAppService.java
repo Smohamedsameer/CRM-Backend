@@ -384,6 +384,39 @@ public class WhatsAppService {
             throw new WhatsAppApiException("Cannot retry message " + failedMessage.getId()
                     + ": stored request payload is not valid JSON: " + e.getMessage(), e);
         }
+        ensureImageHeader(payload);
         return dispatch(failedMessage, payload);
+    }
+
+    /**
+     * A failed message stored before the image header was configured for its template (e.g. remind_util, error
+     * 132012 "expected IMAGE, received UNKNOWN") has no header component. Add it here so Retry actually works.
+     */
+    @SuppressWarnings("unchecked")
+    private void ensureImageHeader(Map<String, Object> payload) {
+        Object t = payload.get("template");
+        if (!(t instanceof Map)) return;
+        Map<String, Object> template = (Map<String, Object>) t;
+        Object name = template.get("name");
+        if (name == null || !whatsAppProperties.hasImageHeader(name.toString())) return;
+
+        List<Map<String, Object>> components = new ArrayList<>();
+        Object existing = template.get("components");
+        if (existing instanceof List<?> list) {
+            for (Object c : list) {
+                if (c instanceof Map) {
+                    Map<String, Object> component = (Map<String, Object>) c;
+                    if ("header".equals(component.get("type"))) return; // already has its header
+                    components.add(component);
+                }
+            }
+        }
+        String headerImageUrl = whatsAppProperties.getHeaderImageUrl();
+        if (headerImageUrl == null || headerImageUrl.isBlank()) {
+            throw new WhatsAppApiException("Template " + name + " has an image header, but WHATSAPP_HEADER_IMAGE_URL "
+                    + "is not set. Set it to a public HTTPS JPG/PNG (max 5 MB).", null);
+        }
+        components.add(0, headerImageComponent(headerImageUrl));
+        template.put("components", components);
     }
 }

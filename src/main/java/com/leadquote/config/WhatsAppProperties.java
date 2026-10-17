@@ -48,10 +48,19 @@ public class WhatsAppProperties {
      * (WHATSAPP_IMAGE_HEADER_TEMPLATES). Remove a name if that template has NO header - sending a
      * header to a template without one fails with a parameter-mismatch error.
      */
-    private String imageHeaderTemplates = "confirm_util,order_util,customer_util";
+    private String imageHeaderTemplates = "confirm_util,order_util,customer_util,remind_util";
+
+    /**
+     * remind_util was approved (as a Marketing template) WITH an image header, so it always needs the header
+     * image - even if WHATSAPP_IMAGE_HEADER_TEMPLATES on the server was set before it existed and does not list it.
+     * Set WHATSAPP_REMINDER_HAS_IMAGE_HEADER=false only if the template is ever re-created without a header.
+     */
+    private boolean reminderHasImageHeader = true;
 
     public boolean hasImageHeader(String templateName) {
-        if (imageHeaderTemplates == null || templateName == null) return false;
+        if (templateName == null) return false;
+        if (reminderHasImageHeader && templateName.equalsIgnoreCase(reminderTemplateName)) return true;
+        if (imageHeaderTemplates == null) return false;
         for (String t : imageHeaderTemplates.split(",")) {
             if (t.trim().equalsIgnoreCase(templateName)) return true;
         }
