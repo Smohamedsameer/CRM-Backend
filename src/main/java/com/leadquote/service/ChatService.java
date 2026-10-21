@@ -198,14 +198,15 @@ public class ChatService {
         String clean = text == null ? "" : text.strip();
         if (clean.isEmpty()) throw new IllegalArgumentException("Message is empty.");
 
+        // Anyone can start the conversation. Inside the 24h window the text goes out as a normal chat message;
+        // outside it (or when the customer never wrote) WhatsApp only accepts an approved template.
         WhatsAppMessage lastIn = lastInbound(leadId).orElse(null);
-        if (lastIn == null || !isOpen(lastIn.getCreatedAt())) {
-            throw new IllegalArgumentException("The 24-hour reply window is closed. WhatsApp only allows free-text "
-                    + "replies within 24 hours of the customer's last message. Wait for the customer to message "
-                    + "again, or send an approved template message from the lead page.");
+        WhatsAppMessage saved;
+        if (lastIn != null && isOpen(lastIn.getCreatedAt())) {
+            saved = whatsAppService.sendText(lead, lastIn.getContactPhone(), clean, employeeName);
+        } else {
+            saved = whatsAppService.sendChatTemplate(lead, clean, employeeName);
         }
-
-        WhatsAppMessage saved = whatsAppService.sendText(lead, lastIn.getContactPhone(), clean, employeeName);
         return toDto(saved);
     }
 

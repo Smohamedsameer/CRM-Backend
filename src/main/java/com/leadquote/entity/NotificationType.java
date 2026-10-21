@@ -2,5 +2,6 @@ package com.leadquote.entity;
 
 public enum NotificationType {
     ENQUIRY_SUBMITTED,
-    CHANGES_REQUESTED
+    CHANGES_REQUESTED,
+    CALLED_TO_ORDER
 }

@@ -191,6 +191,12 @@ public class WhatsAppService {
 
     private WhatsAppMessage sendTemplateMessage(Lead lead, WhatsAppMessageType type, String templateName,
                                                  List<Map<String, Object>> components, String summary) {
+        return sendTemplateMessage(lead, type, templateName, components, summary, null);
+    }
+
+    private WhatsAppMessage sendTemplateMessage(Lead lead, WhatsAppMessageType type, String templateName,
+                                                 List<Map<String, Object>> components, String summary,
+                                                 java.util.function.Consumer<WhatsAppMessage> customizer) {
         WhatsAppMessage message = WhatsAppMessage.builder()
                 .lead(lead)
                 .type(type)
@@ -198,6 +204,7 @@ public class WhatsAppService {
                 .payloadSummary(summary.length() > 500 ? summary.substring(0, 500) : summary)
                 .deliveryStatus(MessageDeliveryStatus.QUEUED)
                 .build();
+        if (customizer != null) customizer.accept(message);
         message = whatsAppMessageRepository.save(message);
 
         // Templates approved WITH a media sample have an image header, and Meta rejects the send if the
@@ -229,6 +236,26 @@ public class WhatsAppService {
         payload.put("template", template);
 
         return dispatch(message, payload);
+    }
+
+    // =========================================================================
+    // Chat message to a customer who has NOT written in the last 24h (or never): WhatsApp rejects free text
+    // there, so the typed message travels as a variable of the approved chat template (chat_util).
+    // Body params: customer name, message. The bubble in the Chat screen shows the typed text itself.
+    // =========================================================================
+    public WhatsAppMessage sendChatTemplate(Lead lead, String text, String sentBy) {
+        // WhatsApp template variables cannot contain new lines, tabs or 4+ spaces in a row
+        String flat = text.replaceAll("[\\r\\n\\t]+", " ").replaceAll(" {2,}", " ").strip();
+        List<Map<String, Object>> components = List.of(bodyComponent(lead.getCustomerName(), flat));
+        String template = whatsAppProperties.getChatTemplateName();
+        String summary = template + " -> " + lead.getCustomerName() + ": " + flat;
+        return sendTemplateMessage(lead, WhatsAppMessageType.FOLLOW_UP, template, components, summary, m -> {
+            m.setDirection(MessageDirection.OUTBOUND);
+            m.setContactPhone(lead.getPhone());
+            m.setBody(text);
+            m.setSentBy(sentBy);
+            m.setAgentSeen(true);
+        });
     }
 
     // =========================================================================

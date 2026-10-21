@@ -260,6 +260,30 @@ public class QuotationService {
         return saved;
     }
 
+    /**
+     * The customer tapped "Call to confirm order" on the quotation page. The lead is marked CALLED_TO_ORDER so the
+     * dashboard shows it, and the team gets a notification. Never downgrades a lead that is already an order.
+     */
+    @Transactional
+    public Quotation markCalledToOrder(String token) {
+        Quotation quotation = getByPublicTokenForPdf(token); // token + expiry check, does not change the quotation status
+        Lead lead = quotation.getLead();
+        if (lead.getStatus() == LeadStatus.ORDER_CONFIRMED || lead.getStatus() == LeadStatus.CALLED_TO_ORDER) {
+            return quotation;
+        }
+        lead.setStatus(LeadStatus.CALLED_TO_ORDER);
+        Quotation saved = quotationRepository.save(quotation);
+
+        auditService.log("Quotation", saved.getId(), "CALLED_TO_ORDER",
+                "Customer tapped Call to confirm order on quotation " + saved.getQuotationNumber());
+        notificationService.create(
+                NotificationType.CALLED_TO_ORDER,
+                "Customer is calling to confirm the order",
+                lead.getCustomerName() + " tapped \"Call to confirm order\" on quotation " + saved.getQuotationNumber(),
+                "Lead", lead.getId(), "/leads/" + lead.getId());
+        return saved;
+    }
+
     private Quotation getValidQuotationForToken(String token) {
         Quotation quotation = quotationRepository.findBySecureToken(token)
                 .orElseThrow(() -> new InvalidTokenException("Invalid quotation link"));

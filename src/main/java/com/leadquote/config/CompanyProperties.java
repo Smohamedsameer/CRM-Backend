@@ -16,6 +16,8 @@ public class CompanyProperties {
     private String address;
     private String gstNumber;
     private String logoPath;
+    /** Number the customer's "Call to confirm order" button dials: the Managing Director (COMPANY_MD_PHONE). */
+    private String mdPhone = "+919942466663";
     /** Public base URL of the deployed frontend, e.g. https://yourdomain.com */
     private String publicBaseUrl;
     /**

@@ -3,7 +3,9 @@ package com.leadquote.controller;
 import com.leadquote.dto.EnquirySubmitRequest;
 import com.leadquote.dto.RequestChangesRequest;
 import com.leadquote.entity.Enquiry;
+import com.leadquote.config.CompanyProperties;
 import com.leadquote.entity.Lead;
+import com.leadquote.entity.LeadStatus;
 import com.leadquote.entity.Quotation;
 import com.leadquote.service.EnquiryService;
 import com.leadquote.service.LeadService;
@@ -15,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -30,6 +33,7 @@ public class PublicController {
     private final LeadService leadService;
     private final EnquiryService enquiryService;
     private final QuotationService quotationService;
+    private final CompanyProperties companyProperties;
 
     // ---- Enquiry form --------------------------------------------------
 
@@ -56,17 +60,28 @@ public class PublicController {
     @GetMapping("/quotations/{token}")
     public Map<String, Object> viewQuotation(@PathVariable String token) {
         Quotation q = quotationService.getByPublicToken(token);
-        return Map.of(
-                "quotationNumber", q.getQuotationNumber(),
-                "customerName", q.getCustomerName(),
-                "companyName", q.getCompanyName() == null ? "" : q.getCompanyName(),
-                "subtotal", q.getSubtotal(),
-                "discount", q.getDiscount(),
-                "tax", q.getTax(),
-                "totalAmount", q.getTotalAmount(),
-                "validUntil", q.getValidUntil(),
-                "status", q.getStatus()
-        );
+        Lead lead = q.getLead();
+        // The page shows one status: "Called to order" once the customer has tapped the call button.
+        String status = lead != null && lead.getStatus() == LeadStatus.CALLED_TO_ORDER
+                ? LeadStatus.CALLED_TO_ORDER.name() : q.getStatus().name();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("quotationNumber", q.getQuotationNumber());
+        body.put("customerName", q.getCustomerName());
+        body.put("companyName", q.getCompanyName() == null ? "" : q.getCompanyName());
+        body.put("phone", lead == null || lead.getPhone() == null ? "" : lead.getPhone());
+        body.put("address", lead == null || lead.getAddress() == null ? "" : lead.getAddress());
+        body.put("totalAmount", q.getTotalAmount());
+        body.put("validUntil", q.getValidUntil());
+        body.put("status", status);
+        body.put("callPhone", companyProperties.getMdPhone());
+        return body;
+    }
+
+    /** "Call to confirm order" button: records "Called to order" on the lead (the phone dialer itself opens on the customer's device). */
+    @PostMapping("/quotations/{token}/called-to-order")
+    public Map<String, Object> calledToOrder(@PathVariable String token) {
+        quotationService.markCalledToOrder(token);
+        return Map.of("status", LeadStatus.CALLED_TO_ORDER.name());
     }
 
     @GetMapping("/quotations/{token}/pdf")

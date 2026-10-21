@@ -82,6 +82,13 @@ public class WhatsAppProperties {
     private String orderTemplateName = "order_util";
     /** Sent when an admin replies to a customer's "request changes" note. (WHATSAPP_CUSTOMER_TEMPLATE_NAME) */
     private String customerTemplateName = "customer_util";
+    /**
+     * Template used when an employee types a message in the Chat screen but the customer has NOT written in the
+     * last 24 hours (WHATSAPP_CHAT_TEMPLATE_NAME). WhatsApp does not allow free text in that case, so the typed text is
+     * sent as a variable of this approved template. It needs exactly 2 body variables:
+     * {{1}} = customer name, {{2}} = the message, e.g. "Hello {{1}}, this is Senela International Ventures. {{2}}".
+     */
+    private String chatTemplateName = "chat_util";
 
     /**
      * Language code the templates were approved under in WhatsApp Manager (WHATSAPP_TEMPLATE_LANGUAGE).

@@ -32,6 +32,7 @@ public class DashboardController {
                         + leadRepository.countByStatus(LeadStatus.WELCOME_SENT),
                 "formsSubmitted", leadRepository.countByStatus(LeadStatus.FORM_SUBMITTED),
                 "quotationsSent", leadRepository.countByStatus(LeadStatus.QUOTATION_SENT),
+                "calledToOrder", leadRepository.countByStatus(LeadStatus.CALLED_TO_ORDER),
                 "quotationsAccepted", leadRepository.countByStatus(LeadStatus.ACCEPTED),
                 "changesRequested", leadRepository.countByStatus(LeadStatus.CHANGES_REQUESTED),
                 "ordersConfirmed", leadRepository.countByStatus(LeadStatus.ORDER_CONFIRMED)
