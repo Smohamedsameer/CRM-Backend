@@ -12,22 +12,24 @@ public final class ChatDtos {
     private ChatDtos() {
     }
 
-    /** One row of the conversation list on the left of the chat screen. */
+    /** One row of the conversation list on the left of the chat screen. other = a number that is not in our leads
+     * (leadId/leadCode are then null and phone is the number, which is also the key of that chat). */
     public record ConversationDto(Long leadId, String leadCode, String customerName, String phone,
                                   String lastMessage, String lastDirection, Instant lastAt,
-                                  long unread, boolean windowOpen) {
+                                  long unread, boolean windowOpen, boolean other) {
     }
 
-    /** One chat bubble. kind = CUSTOMER (inbound), REPLY (typed by an employee) or TEMPLATE (welcome/quotation/...). */
+    /** One chat bubble. kind = CUSTOMER (inbound), REPLY (typed or a file sent by an employee), TEMPLATE (welcome/quotation/...) or DELETED. */
     public record MessageDto(Long id, String direction, String kind, String text, String status,
-                             String errorMessage, String sentBy, Instant at) {
+                             String errorMessage, String sentBy, Instant at,
+                             String attachmentName, String attachmentMime, Long attachmentSize) {
     }
 
     public record LeadInfo(Long id, String leadCode, String customerName, String phone) {
     }
 
     /** windowOpen = the customer wrote to us in the last 24h, so a free-text reply is allowed. */
-    public record ThreadDto(LeadInfo lead, boolean windowOpen, Instant windowClosesAt, List<MessageDto> messages) {
+    public record ThreadDto(LeadInfo lead, boolean other, boolean windowOpen, Instant windowClosesAt, List<MessageDto> messages) {
     }
 
     public record SendRequest(@NotBlank @Size(max = 4096) String text) {

@@ -62,9 +62,20 @@ public class WhatsAppWebhookController {
                     // Inbound customer messages: stored so they show up in the Chat screen.
                     List<Map<String, Object>> inbound = (List<Map<String, Object>>) value.get("messages");
                     if (inbound != null) {
+                        // wa_id -> WhatsApp profile name, used to name a lead created for an unknown sender
+                        Map<String, String> names = new java.util.HashMap<>();
+                        Object contacts = value.get("contacts");
+                        if (contacts instanceof List<?> list) {
+                            for (Object c : list) {
+                                if (c instanceof Map<?, ?> cm && cm.get("wa_id") != null && cm.get("profile") instanceof Map<?, ?> pm && pm.get("name") != null) {
+                                    names.put(cm.get("wa_id").toString(), pm.get("name").toString());
+                                }
+                            }
+                        }
                         for (Map<String, Object> inboundMessage : inbound) {
                             try {
-                                chatService.recordInbound(inboundMessage);
+                                Object from = inboundMessage.get("from");
+                                chatService.recordInbound(inboundMessage, from == null ? null : names.get(from.toString()));
                             } catch (Exception ex) {
                                 log.error("Failed to store inbound WhatsApp message: {}", ex.getMessage());
                             }

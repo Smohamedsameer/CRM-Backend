@@ -28,6 +28,34 @@ public class SchemaMigration implements CommandLineRunner {
     public void run(String... args) {
         widenEnumColumn("leads", "status");
         widenEnumColumn("notifications", "type");
+        allowNull("whatsapp_messages", "lead_id", "BIGINT");
+        removeOrphanAttachments();
+    }
+
+    /** Messages from people who are not leads have no lead: the old NOT NULL on lead_id has to go (one time). */
+    private void allowNull(String table, String column, String type) {
+        try {
+            List<String> nullable = jdbc.queryForList(
+                    "SELECT IS_NULLABLE FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                    String.class, table, column);
+            if (nullable.isEmpty() || !"NO".equalsIgnoreCase(nullable.get(0))) return;
+            jdbc.execute("ALTER TABLE `" + table + "` MODIFY COLUMN `" + column + "` " + type + " NULL");
+            log.info("Made {}.{} nullable", table, column);
+        } catch (Exception e) {
+            log.warn("Could not make {}.{} nullable: {}. Chats from numbers that are not leads will fail to save until you run: "
+                    + "ALTER TABLE {} MODIFY COLUMN {} {} NULL;", table, column, e.getMessage(), table, column, type);
+        }
+    }
+
+    /** Chat files whose message no longer exists (e.g. left behind by an older delete) are dead weight in the database. */
+    private void removeOrphanAttachments() {
+        try {
+            int n = jdbc.update("DELETE FROM chat_attachments WHERE message_id NOT IN (SELECT id FROM whatsapp_messages)");
+            if (n > 0) log.info("Removed {} orphaned chat attachment(s)", n);
+        } catch (Exception e) {
+            log.debug("Orphan attachment cleanup skipped: {}", e.getMessage());
+        }
     }
 
     private void widenEnumColumn(String table, String column) {

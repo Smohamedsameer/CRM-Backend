@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class WhatsAppMessageController {
 
     private final WhatsAppMessageRepository whatsAppMessageRepository;
+    private final com.leadquote.repository.ChatAttachmentRepository chatAttachmentRepository;
     private final WhatsAppService whatsAppService;
     private final LeadRepository leadRepository;
     private final AuditService auditService;
@@ -35,6 +36,7 @@ public class WhatsAppMessageController {
         if (!leadRepository.existsById(leadId)) {
             throw new NotFoundException("Lead not found: " + leadId);
         }
+        chatAttachmentRepository.deleteByLeadId(leadId);
         whatsAppMessageRepository.deleteByLeadId(leadId);
         auditService.log("Lead", leadId, "WHATSAPP_HISTORY_CLEARED", "WhatsApp message history cleared for lead " + leadId);
     }

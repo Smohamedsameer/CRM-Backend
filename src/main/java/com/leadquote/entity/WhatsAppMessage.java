@@ -18,9 +18,10 @@ public class WhatsAppMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Null for a customer who wrote to us but is not in our leads: those chats are shown under Chat > Other. */
     @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lead_id", nullable = false)
+    @JoinColumn(name = "lead_id")
     private Lead lead;
 
     @Enumerated(EnumType.STRING)
@@ -62,11 +63,24 @@ public class WhatsAppMessage {
     /** The customer's WhatsApp number exactly as Meta reports it (digits incl. country code). Replies go here. */
     private String contactPhone;
 
+    /** The sender's WhatsApp profile name (from the webhook), shown for people who are not in our leads. */
+    private String contactName;
+
     /** Employee who typed a chat reply. */
     private String sentBy;
 
     /** Inbound messages only: false until an employee opens the chat. Null (old rows / outbound) counts as seen. */
     private Boolean agentSeen;
+
+    /** File sent from the Chat screen (the bytes live in chat_attachments, loaded only when opened). */
+    private String attachmentName;
+    private String attachmentMime;
+    private Long attachmentSize;
+
+    /** "Delete for everyone": the message is removed from the CRM chat for every employee (it stays on the customer's WhatsApp). */
+    private Boolean deleted;
+    private String deletedBy;
+    private LocalDateTime deletedAt;
 
     private LocalDateTime sentAt;
     private LocalDateTime deliveredAt;

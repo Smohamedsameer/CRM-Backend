@@ -44,6 +44,8 @@ public class LeadService {
     private final NotificationRepository notificationRepository;
     private final QuotationPdfFileRepository quotationPdfFileRepository;
     private final QuotationFormDataRepository quotationFormDataRepository;
+    private final com.leadquote.repository.ChatAttachmentRepository chatAttachmentRepository;
+    private final com.leadquote.repository.WhatsAppMessageRepository whatsAppMessageRepository;
 
     private final SecureRandom secureRandom = new SecureRandom();
     // Simple in-memory counter fallback; for multi-instance deployments back this with a DB sequence.
@@ -69,6 +71,12 @@ public class LeadService {
 
         Lead saved = leadRepository.save(lead);
         auditService.log("Lead", saved.getId(), "LEAD_CREATED", "Lead " + saved.getLeadCode() + " created by " + createdByEmail);
+
+        // If this person had already written to us (shown under Chat > Other), that conversation joins the new lead.
+        String digits = saved.getPhone() == null ? "" : saved.getPhone().replaceAll("[^0-9]", "");
+        if (digits.length() >= 7) {
+            whatsAppMessageRepository.adoptOther(saved, digits.length() > 10 ? digits.substring(digits.length() - 10) : digits);
+        }
 
         triggerWelcomeWorkflow(saved);
 
@@ -131,6 +139,7 @@ public class LeadService {
         Lead lead = getById(id);
         String code = lead.getLeadCode();
         String name = lead.getCustomerName();
+        chatAttachmentRepository.deleteByLeadId(id); // files sent in the chat go with the lead's messages
 
         List<String> pdfPaths = new ArrayList<>();
         for (Quotation quotation : lead.getQuotations()) {

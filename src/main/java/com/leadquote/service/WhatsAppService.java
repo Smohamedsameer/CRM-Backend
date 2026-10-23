@@ -6,11 +6,13 @@ import com.leadquote.config.CompanyProperties;
 import com.leadquote.config.WhatsAppProperties;
 import com.leadquote.entity.*;
 import com.leadquote.exception.WhatsAppApiException;
+import com.leadquote.repository.ChatAttachmentRepository;
 import com.leadquote.repository.WhatsAppMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.BodyInserters;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +44,7 @@ public class WhatsAppService {
     private final CompanyProperties companyProperties;
     private final SettingsService settingsService;
     private final WhatsAppMessageRepository whatsAppMessageRepository;
+    private final ChatAttachmentRepository chatAttachmentRepository;
     private final ObjectMapper objectMapper;
 
     // =========================================================================
@@ -200,7 +203,7 @@ public class WhatsAppService {
         WhatsAppMessage message = WhatsAppMessage.builder()
                 .lead(lead)
                 .type(type)
-                .toPhone(lead.getPhone())
+                .toPhone(lead != null ? lead.getPhone() : null)
                 .payloadSummary(summary.length() > 500 ? summary.substring(0, 500) : summary)
                 .deliveryStatus(MessageDeliveryStatus.QUEUED)
                 .build();
@@ -243,15 +246,16 @@ public class WhatsAppService {
     // there, so the typed message travels as a variable of the approved chat template (chat_util).
     // Body params: customer name, message. The bubble in the Chat screen shows the typed text itself.
     // =========================================================================
-    public WhatsAppMessage sendChatTemplate(Lead lead, String text, String sentBy) {
+    public WhatsAppMessage sendChatTemplate(Lead lead, String greetName, String phone, String text, String sentBy) {
         // WhatsApp template variables cannot contain new lines, tabs or 4+ spaces in a row
         String flat = text.replaceAll("[\\r\\n\\t]+", " ").replaceAll(" {2,}", " ").strip();
-        List<Map<String, Object>> components = List.of(bodyComponent(lead.getCustomerName(), flat));
+        List<Map<String, Object>> components = List.of(bodyComponent(greetName, flat));
         String template = whatsAppProperties.getChatTemplateName();
-        String summary = template + " -> " + lead.getCustomerName() + ": " + flat;
+        String summary = template + " -> " + greetName + ": " + flat;
         return sendTemplateMessage(lead, WhatsAppMessageType.FOLLOW_UP, template, components, summary, m -> {
             m.setDirection(MessageDirection.OUTBOUND);
-            m.setContactPhone(lead.getPhone());
+            m.setToPhone(phone);
+            m.setContactPhone(phone);
             m.setBody(text);
             m.setSentBy(sentBy);
             m.setAgentSeen(true);
@@ -289,6 +293,83 @@ public class WhatsAppService {
         payload.put("type", "text");
         payload.put("text", Map.of("preview_url", true, "body", text));
         return dispatch(message, payload);
+    }
+
+    // =========================================================================
+    // Chat attachment - a PDF / image / office file sent from the Chat screen.
+    // Like free text, WhatsApp only accepts it inside the customer's 24h window (ChatService checks that).
+    // The file is uploaded to Meta first (/media -> media id), then sent as an "image" or "document" message.
+    // The bytes are also kept in chat_attachments so staff can open the file later.
+    // =========================================================================
+    public WhatsAppMessage sendMedia(Lead lead, String toPhone, byte[] data, String filename, String mime,
+                                     String caption, String sentBy) {
+        String to = (toPhone != null && !toPhone.isBlank()) ? toPhone : lead.getPhone();
+        String mediaId = uploadMedia(data, filename, mime); // throws before anything is stored if Meta rejects the file
+        boolean image = mime.startsWith("image/");
+        boolean hasCaption = caption != null && !caption.isBlank();
+
+        WhatsAppMessage message = WhatsAppMessage.builder()
+                .lead(lead)
+                .type(WhatsAppMessageType.FOLLOW_UP)
+                .direction(MessageDirection.OUTBOUND)
+                .toPhone(to)
+                .contactPhone(to)
+                .body(hasCaption ? caption.strip() : null)
+                .sentBy(sentBy)
+                .agentSeen(true)
+                .attachmentName(filename)
+                .attachmentMime(mime)
+                .attachmentSize((long) data.length)
+                .payloadSummary((image ? "[Photo] " : "[Document] ") + filename)
+                .deliveryStatus(MessageDeliveryStatus.QUEUED)
+                .build();
+        message = whatsAppMessageRepository.save(message);
+        chatAttachmentRepository.save(com.leadquote.entity.ChatAttachment.builder().messageId(message.getId()).data(data).build());
+
+        Map<String, Object> media = new HashMap<>();
+        media.put("id", mediaId);
+        if (hasCaption) media.put("caption", caption.strip());
+        if (!image) media.put("filename", filename);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("recipient_type", "individual");
+        payload.put("to", normalizePhone(to));
+        payload.put("type", image ? "image" : "document");
+        payload.put(image ? "image" : "document", media);
+        return dispatch(message, payload);
+    }
+
+    /** Uploads a file to WhatsApp and returns its media id (valid for 30 days, so a Retry can reuse it). */
+    private String uploadMedia(byte[] data, String filename, String mime) {
+        String url = whatsAppProperties.graphBaseUrl() + "/" + whatsAppProperties.getPhoneNumberId() + "/media";
+        org.springframework.http.client.MultipartBodyBuilder form = new org.springframework.http.client.MultipartBodyBuilder();
+        form.part("messaging_product", "whatsapp");
+        form.part("type", mime);
+        form.part("file", new org.springframework.core.io.ByteArrayResource(data))
+                .filename(filename)
+                .contentType(org.springframework.http.MediaType.parseMediaType(mime));
+        try {
+            Map<?, ?> response = webClient.post()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + whatsAppProperties.getAccessToken())
+                    .body(BodyInserters.fromMultipartData(form.build()))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block(java.time.Duration.ofSeconds(60));
+            Object id = response == null ? null : response.get("id");
+            if (id == null) throw new WhatsAppApiException("WhatsApp did not return a media id for the file.", null);
+            return id.toString();
+        } catch (WhatsAppApiException e) {
+            throw e;
+        } catch (Exception ex) {
+            String reason = ex.getMessage();
+            if (ex instanceof org.springframework.web.reactive.function.client.WebClientResponseException wre) {
+                reason = ex.getMessage() + " | Meta response: " + wre.getResponseBodyAsString();
+            }
+            log.error("WhatsApp media upload failed: {}", reason);
+            throw new WhatsAppApiException("Could not upload the file to WhatsApp: " + reason, ex);
+        }
     }
 
     /**
@@ -357,7 +438,7 @@ public class WhatsAppService {
                 // Include Meta's own JSON error (code / message / error_data) - it says exactly what is wrong.
                 reason = ex.getMessage() + " | Meta response: " + wre.getResponseBodyAsString();
             }
-            log.error("WhatsApp API call failed for lead {}: {}", message.getLead().getLeadCode(), reason);
+            log.error("WhatsApp API call failed for {}: {}", message.getLead() != null ? message.getLead().getLeadCode() : message.getContactPhone(), reason);
             message.setDeliveryStatus(MessageDeliveryStatus.FAILED);
             message.setErrorMessage(reason.length() > 1000 ? reason.substring(0, 1000) : reason);
             message.setRetryCount(message.getRetryCount() + 1);
